@@ -1,18 +1,18 @@
 //
 // Created by David Nugent on 31/01/2016.
 //
-// opsisd.h
 
-#ifndef OPSISD_OPISD_H
-#define OPSISD_OPISD_H
+#ifndef HDMI2USBD_HDMI2USBD_H
+#define HDMI2USBD_HDMI2USBD_H
 
-#define OPSISD_VERSION "0.1"
-#define OPSISD_NAME "opsisd"
+#define HDMI2USBD_VERSION "0.1"
+#define HDMI2USBD_NAME "hdmi2usbd"
 
-#define OPSIS_MAX_PORTS 31
+#define MAX_SERIAL_SPECS 31
+
 
 // configuration data
-struct opsisd_opts {
+struct hdmi2usb_opts {
     int verbose;
     int logflags;
     char const *logfile;
@@ -24,8 +24,8 @@ struct opsisd_opts {
 };
 
 // working data
-struct opsisd {
-    struct opsisd_opts opts;
+struct hdmi2usb {
+    struct hdmi2usb_opts opts;
 };
 
 
@@ -35,10 +35,8 @@ struct ctrldev {
     char *devname;
 };
 
-struct ctrldev *find_opsis_serial_all(const struct opsisd_opts *opts);
+struct ctrldev *find_serial_all(const struct hdmi2usb_opts *opts);
 void ctrldev_free(struct ctrldev *first_dev);
-char *find_opsis_serial(const struct opsisd_opts *opts);
+char *find_serial(const struct hdmi2usb_opts *opts);
 
-
-
-#endif //OPSISD_OPISD_H
+#endif //HDMI2USBD_HDMI2USBD_H

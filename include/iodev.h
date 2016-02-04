@@ -3,8 +3,8 @@
 //
 // Generic device type
 
-#ifndef OPSISD_IODEV_H
-#define OPSISD_IODEV_H
+#ifndef GENERIC_IODEV_H
+#define GENERIC_IODEV_H
 
 // common device interface
 
@@ -95,4 +95,4 @@ extern int iodev_except_handler(iodev_t *dev);
 extern int iodev_read(iodev_t *dev, void *buf, size_t len);
 extern int iodev_write(iodev_t *dev, void const *buf, size_t len);
 
-#endif //OPSISD_IODEV_H
+#endif //GENERIC_IODEV_H

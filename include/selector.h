@@ -3,8 +3,8 @@
 //
 // Generic selector type for registering filehandles in a non-blocking select(2)
 
-#ifndef OPSISD_SELECTOR_H
-#define OPSISD_SELECTOR_H
+#ifndef GENERIC_SELECTOR_H
+#define GENERIC_SELECTOR_H
 
 #include "array.h"
 #include "iodev.h"
@@ -22,4 +22,4 @@ extern size_t selector_device_count(selector_t *selector);
 extern iodev_t *selector_get_device(selector_t *selector, size_t index);
 extern void selector_add_device(selector_t *selector, iodev_t *dev);
 
-#endif //OPSISD_SELECTOR_H
+#endif //GENERIC_SELECTOR_H

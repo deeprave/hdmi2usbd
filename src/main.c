@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "opsisd.h"
+#include "hdmi2usbd.h"
 #include "serial.h"
 #include "logging.h"
 
@@ -55,7 +55,7 @@ static int usage(FILE *out, int exitCode);
 
 
 int
-parse_args(int argc, char * const *argv, struct opsisd_opts *opts) {
+parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
     int rc =0, r =0;
     int longindex = 0;
 
@@ -75,7 +75,7 @@ parse_args(int argc, char * const *argv, struct opsisd_opts *opts) {
                 exit(usage(stdout, 0));
                 // notreached
             case 'v':
-                printf("%s version %s\n", OPSISD_NAME, OPSISD_VERSION);
+                printf("%s version %s\n", HDMI2USBD_NAME, HDMI2USBD_VERSION);
                 exit(0);
                 // notreached
             case 'V':
@@ -125,9 +125,9 @@ parse_args(int argc, char * const *argv, struct opsisd_opts *opts) {
             }
                 break;
             case 'p': {
-                const char *args[OPSIS_MAX_PORTS + 1];
+                const char *args[MAX_SERIAL_SPECS + 1];
                 int count = 0, index = optind - 1;
-                for (count =0; index < argc && index < OPSIS_MAX_PORTS; count++) {
+                for (count =0; index < argc && index < MAX_SERIAL_SPECS; count++) {
                     const char *next = argv[index++];
                     if (next == NULL || *next == '-' || *next == '\0')
                         break;
@@ -188,7 +188,7 @@ parse_args(int argc, char * const *argv, struct opsisd_opts *opts) {
 
 static int
 usage(FILE *out, int ec) {
-    fprintf(out, "%s [ options ]\n Options:\n", OPSISD_NAME);
+    fprintf(out, "%s [ options ]\n Options:\n", HDMI2USBD_NAME);
     for(int index =0; index < sizeof(longopts)/sizeof(struct option); index++) {
         int len = 0;
         switch (longopts[index].has_arg) {
@@ -210,17 +210,17 @@ usage(FILE *out, int ec) {
 
 int
 main(int argc, char * const *argv) {
-    struct opsisd opsisd = {};
+    struct hdmi2usb app = {};
 
-    int rc = parse_args(argc, argv, &opsisd.opts);
+    int rc = parse_args(argc, argv, &app.opts);
     if (rc == 0) {
-        log_init(opsisd.opts.logflags, opsisd.opts.verbose, opsisd.opts.logfile);
-        log_debug("      Device : %s", opsisd.opts.port);
-        log_debug("    Baudrate : %ld", baud_to_speed(opsisd.opts.baudrate));
-        log_debug("Bind Address : %s", opsisd.opts.listen_addr);
-        log_debug("   Bind Port : %u", opsisd.opts.listen_port);
-        log_debug("   Daemonize : %s", opsisd.opts.daemonize ? "Yes" : "No");
-        log_debug("   Verbosity : %d", opsisd.opts.verbose);
+        log_init(app.opts.logflags, app.opts.verbose, app.opts.logfile);
+        log_debug("      Device : %s", app.opts.port);
+        log_debug("    Baudrate : %ld", baud_to_speed(app.opts.baudrate));
+        log_debug("Bind Address : %s", app.opts.listen_addr);
+        log_debug("   Bind Port : %u", app.opts.listen_port);
+        log_debug("   Daemonize : %s", app.opts.daemonize ? "Yes" : "No");
+        log_debug("   Verbosity : %d", app.opts.verbose);
     }
     return rc;
 }

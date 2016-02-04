@@ -2,8 +2,8 @@
 // Created by David Nugent on 2/02/2016.
 // Logging functions & interface
 
-#ifndef OPSISD_LOGGING_H
-#define OPSISD_LOGGING_H
+#ifndef GENERIC_LOGGING_H
+#define GENERIC_LOGGING_H
 
 #include <stddef.h>
 #include <stdarg.h>
@@ -50,4 +50,4 @@ extern int log_debug(char const *fmt, ...) __attribute__((format (printf, 1, 2))
 extern int log_trace(char const *fmt, ...) __attribute__((format (printf, 1, 2)));
 extern int log_message(enum Verbosity verbose, char const *fmt, ...) __attribute__((format (printf, 2, 3)));
 
-#endif //OPSISD_LOGGING_H
+#endif //GENERIC_LOGGING_H

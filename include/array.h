@@ -2,8 +2,8 @@
 // Created by David Nugent on 3/02/2016.
 // Simple dynamic array
 
-#ifndef OPSISD_ARRAY_H
-#define OPSISD_ARRAY_H
+#ifndef GENERIC_ARRAY_H
+#define GENERIC_ARRAY_H
 
 #include <stddef.h>
 #include <stdarg.h>
@@ -45,4 +45,4 @@ size_t array_capacity(array_t const *array);
 size_t array_element_size(array_t const *array);
 size_t array_chunk_size(array_t const *array);
 
-#endif //OPSISD_ARRAY_H
+#endif //GENERIC_ARRAY_H

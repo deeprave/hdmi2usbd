@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.4)
 
 option(tests "Build all tests." OFF)         # cmake -Dtest=ON
 
-set(PROJECT_NAME opsisd)
+set(PROJECT_NAME hdmi2usbd)
 project(${PROJECT_NAME})
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
@@ -16,16 +16,16 @@ endif (APPLE)
 include_directories(LOCAL include)
 
 set(OPSISD_SOURCE_FILES
-        src/opsisd.c include/opsisd.h
+        src/hdmi2usbd.c include/hdmi2usbd.h
         src/array.c include/array.h
         src/buffer.c include/buffer.h
         src/serial.c include/serial.h
-        src/network.c include/network.h
+        src/nettcp.c include/nettcp.h
         src/selector.c include/selector.h
         src/logging.c include/logging.h
         src/iodev.c include/iodev.h)
 
-add_executable(opsisd src/main.c ${OPSISD_SOURCE_FILES})
+add_executable(hdmi2usbd src/main.c ${OPSISD_SOURCE_FILES})
 
 ####
 # test support
@@ -45,9 +45,9 @@ if (tests)
     ####
 
     add_executable(runSerialUnitTests ${OPSISD_SOURCE_FILES}
-            tests/serial/test_find_opsis_serial.cc)
+            tests/serial/test_find_serial.cc)
     target_link_libraries(runSerialUnitTests gtest gtest_main)
-    add_test(opsis_serial_interface runSerialUnitTests)
+    add_test(serial_interface runSerialUnitTests)
 
     add_executable(runMiscUnitTests ${OPSISD_SOURCE_FILES}
             tests/misc/test_logging.cc

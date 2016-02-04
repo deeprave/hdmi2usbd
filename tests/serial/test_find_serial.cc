@@ -4,7 +4,7 @@
 
 
 extern "C" {
-#include "opsisd.h"
+#include "hdmi2usbd.h"
 }
 
 #include "logging.h"
@@ -15,7 +15,7 @@ namespace {
     static const char portlist[] = "/dev/ttyVIZ*|ttyACM*|/dev/tty*";
     static const char host[] = "localhost";
 
-    struct opsisd_opts opts = {
+    struct hdmi2usb_opts opts = {
         V_NONE,                             // verbose
         0,                                  // logflags
         NULL,                               // logfile
@@ -26,8 +26,8 @@ namespace {
         8501,                               // listen_port
     };
 
-    TEST(SerialFunctions, findOpsisSerialAll) {
-        struct ctrldev *first_dev = find_opsis_serial_all(&opts);
+    TEST(SerialFunctions, findSerialAll) {
+        struct ctrldev *first_dev = find_serial_all(&opts);
         // assuming we are running on a unix like system
         EXPECT_NE((struct ctrldev *)0, first_dev);
         for (struct ctrldev *next = first_dev; next != NULL; next = next->next) {
@@ -36,8 +36,8 @@ namespace {
         }
     };
 
-    TEST(SerialFunctions, findOpsisSerial) {
-        char *ctrl_dev = find_opsis_serial(&opts);
+    TEST(SerialFunctions, findSerial) {
+        char *ctrl_dev = find_serial(&opts);
         EXPECT_NE((char *)0, ctrl_dev);
         EXPECT_EQ(0, access(ctrl_dev, R_OK|W_OK));
     }

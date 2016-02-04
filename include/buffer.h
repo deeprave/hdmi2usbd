@@ -2,8 +2,8 @@
 // Created by David Nugent on 4/02/2016.
 // Simple ring buffer
 
-#ifndef OPSISD_BUFFER_H
-#define OPSISD_BUFFER_H
+#ifndef GENERIC_BUFFER_H
+#define GENERIC_BUFFER_H
 
 #include <stddef.h>
 
@@ -34,4 +34,4 @@ void * buffer_base(buffer_t *buffer);
 extern size_t buffer_put(buffer_t *buffer, void const *buf, size_t len);
 extern size_t buffer_get(buffer_t *buffer, void *buf, size_t len);
 
-#endif //OPSISD_BUFFER_H
+#endif //GENERIC_BUFFER_H

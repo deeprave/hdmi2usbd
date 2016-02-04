@@ -8,11 +8,12 @@
 #include <wordexp.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include "opsisd.h"
+
+#include "hdmi2usbd.h"
 
 // device list support
 
-static char const *auto_devices = "/dev/ttyACM*|/dev/ttyVIZ*";
+static char const *auto_devices = "/dev/ttyVIZ*|/dev/ttyACM*";
 
 static struct ctrldev *
 new_odev(char const *devicename) {
@@ -40,7 +41,7 @@ ctrldev_free(struct ctrldev *first_dev) {
     }
 }
 
-// This should theoretically test to see if it is an opsis
+// This should theoretically test to see if it is an hdmi2usb
 // probably by figuring out which driver is handling it,
 // however we bypass this and always ok the first one...
 static int
@@ -49,8 +50,8 @@ test_ctrldev(const struct ctrldev *_odev) {
 }
 
 char *
-find_opsis_serial(const struct opsisd_opts *opts) {
-    struct ctrldev *first_dev = find_opsis_serial_all(opts);
+find_serial(const struct hdmi2usb_opts *opts) {
+    struct ctrldev *first_dev = find_serial_all(opts);
     char *result = NULL;
     for (struct ctrldev *next = first_dev; result == NULL && next != NULL; next = next->next) {
         if (test_ctrldev(next)) {
@@ -66,7 +67,7 @@ find_opsis_serial(const struct opsisd_opts *opts) {
 // Attempt to locate
 
 struct ctrldev *
-find_opsis_serial_all(const struct opsisd_opts *opts) {
+find_serial_all(const struct hdmi2usb_opts *opts) {
     static struct ctrldev *first_dev = NULL;
 
     char const *devices = opts->port;
