@@ -17,10 +17,10 @@ struct hdmi2usb_opts {
     int logflags;
     char const *logfile;
     int daemonize;
-    long baudrate;
+    unsigned long baudrate;
     char const *port;
     char const *listen_addr;
-    short listen_port;
+    unsigned short listen_port;
 };
 
 // working data
@@ -38,5 +38,6 @@ struct ctrldev {
 struct ctrldev *find_serial_all(const struct hdmi2usb_opts *opts);
 void ctrldev_free(struct ctrldev *first_dev);
 char *find_serial(const struct hdmi2usb_opts *opts);
+int hdmi2usb_main(struct hdmi2usb *app);
 
 #endif //HDMI2USBD_HDMI2USBD_H

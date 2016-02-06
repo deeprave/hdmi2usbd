@@ -10,6 +10,10 @@
 #include <unistd.h>
 
 #include "hdmi2usbd.h"
+#include "array.h"
+#include "iodev.h"
+#include "logging.h"
+
 
 // device list support
 
@@ -108,4 +112,30 @@ find_serial_all(const struct hdmi2usb_opts *opts) {
         len += skip;
     }
     return first_dev;
+}
+
+int hdmi2usb_error(char const *fmt, va_list arg) { return log_log(V_ERROR, fmt, arg); }
+int hdmi2usb_notify(char const *fmt, va_list arg) { return log_log(V_INFO, fmt, arg); }
+
+
+static int
+hdmi2usb_init(struct hdmi2usb *app) {
+    int rc = 0;
+    // Redirect module error & notification messages to the logger
+    iodev_seterrfunc(hdmi2usb_error);
+    iodev_setnotify(hdmi2usb_notify);
+    array_seterrfunc(hdmi2usb_error);
+
+    return rc;
+}
+
+
+int
+hdmi2usb_main(struct hdmi2usb *app) {
+    int rc = hdmi2usb_init(app);
+    while (rc == 0) {
+        // Main loop
+
+    }
+    return rc;
 }
