@@ -59,14 +59,14 @@ namespace {
 
     // error message thunk, redirects to logging framework
     extern "C" int
-    array_error(array_t *, char const *fmt, va_list args) {
+    array_error(char const *fmt, va_list args) {
         return log_log(V_ERROR, fmt, args);
     }
 
     TEST(ArrayFunctions, arrayErrorFunction) {
         array_t A = {};
         // Set the error message handler
-        array_seterrfunc(&A, array_error);
+        array_seterrfunc(array_error);
         // Now generate an error, same as above
         EXPECT_EQ((void *)0, array_get(&A, 0));
         array_free(&A);
