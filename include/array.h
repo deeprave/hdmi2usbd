@@ -20,14 +20,13 @@ struct array_s {
         e_inc;              // realloc increment size (elements)
     void *data;             // where the data is stored
 
-    int (*errfunc)(array_t *, char const *fmt, va_list args);
 };
 
 extern array_t *array_alloc(size_t element_size, size_t initial_count);
 extern void array_free(array_t *array);
 extern int array_init(array_t *array, size_t element_size, size_t initial_count);
 
-extern void array_seterrfunc(array_t *array, int (*errfunc)(array_t *, char const *fmt, va_list args));
+extern void array_seterrfunc(int (*errfunc)(char const *fmt, va_list args));
 
 extern void *array_get(array_t *array, size_t index); // effectively array[index]
 extern void *array_put(array_t *array, void const *element, size_t index);

@@ -12,19 +12,24 @@
 
 #define ALLOC_MAGIC 0x5a5a5a5a
 
-static int array_error(array_t *array, const char *fmt, ...) __attribute__((format (printf, 2, 3)));
+
+static int array_error(const char *fmt, ...) __attribute__((format (printf, 1, 2)));
 
 static int
-array_error(array_t *array, const char *fmt, ...) {
+array_error_default(char const *fmt, va_list args) {
+    char fmtbuf[strlen(fmt) + 2];
+    strcpy(fmtbuf, fmt);
+    strcat(fmtbuf, "\n");
+    return vfprintf(stderr, fmt, args);
+}
+
+static int (*array_errfunc)(char const *fmt, va_list args) = array_error_default;
+
+static int
+array_error(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    int len = 0;
-    if (array->errfunc != NULL)
-        len = array->errfunc(array, fmt, args);
-    else {
-        len = vfprintf(stderr, fmt, args);
-        len += fprintf(stderr, "\n");
-    }
+    int len = array_errfunc(fmt, args);
     va_end(args);
     return len;
 }
@@ -44,13 +49,14 @@ size_t array_capacity(array_t const *array) { return array->e_all; }
 size_t array_element_size(array_t const *array) { return array->e_size; }
 size_t array_chunk_size(array_t const *array) { return array->e_inc; }
 
+
 #define BOUNDS_FAIL 1
 #define BOUNDS_OK   0
 
 static int
 array_check_bounds(array_t *array, size_t index, size_t within) {
     if (index >= (array->e_end + within)) {
-        array_error(array, "array bounds error: %zu (of %zu elements)", index, array->e_end);
+        array_error("array bounds error: %zu (of %zu elements)", index, array->e_end);
         return BOUNDS_FAIL;
     }
     return BOUNDS_OK;
@@ -86,7 +92,7 @@ array_check_alloc(array_t *array, size_t elements) {
     if (count > array->e_all) {
         void *buf = realloc(array->data, count * array->e_size);
         if (buf == NULL) {
-            array_error(array, "array_check_alloc reallocation failure(%d): %s", errno, strerror(errno));
+            array_error("array_check_alloc reallocation failure(%d): %s", errno, strerror(errno));
             return -1;
         }
         array->data = buf;
@@ -109,8 +115,8 @@ array_init(array_t *array, size_t element_size, size_t initial_count) {
 
 
 void
-array_seterrfunc(array_t *array, int (*errfunc)(array_t *, char const *fmt, va_list args)) {
-    array->errfunc = errfunc;
+array_seterrfunc(int (*errfunc)(char const *fmt, va_list args)) {
+    array_errfunc = errfunc;
 }
 
 
