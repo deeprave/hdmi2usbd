@@ -12,15 +12,15 @@
 
 static struct {
     // configuration data
-    int verbosity;          // Logging verbosity
-    int flags;              // Logging flags
-    char const *logpath;    // Logfile name template
-    char const *datefmt;    // Logfile date/time format
-    char const *logfmt;     // General format of a log line
+    enum Verbosity verbosity;   // Logging verbosity
+    int flags;                  // Logging flags
+    char const *logpath;        // Logfile name template
+    char const *datefmt;        // Logfile date/time format
+    char const *logfmt;         // General format of a log line
     // internal data
     int log_counter;
-    char *logname;          // Current logfile name
-    FILE *logfp;            // Current logfile FILE*
+    char *logname;              // Current logfile name
+    FILE *logfp;                // Current logfile FILE*
 } logData = {
     V_DEFAULT,
     LOG_ECHO,
@@ -140,7 +140,7 @@ log_log(enum Verbosity verbosity, char const *fmt, va_list args) {
             exit(2);
         }
         if (logData.logfp != NULL) {
-            va_list args_2 = {0};
+            va_list args_2 = {{0}};
             va_copy(args_2, args);
             rc = vfprintf(logData.logfp, fmtstr, args_2);
             if (logData.flags & LOG_SYNC) {
