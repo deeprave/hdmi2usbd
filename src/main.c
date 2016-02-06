@@ -12,12 +12,12 @@
 #include <string.h>
 
 #include "hdmi2usbd.h"
-#include "serial.h"
 #include "logging.h"
+#include "serial.h"
 
 
 // short options
-const char shortopts[] = "hvV::Dp:s:l:L:equF";
+const char shortopts[] = "p:s:l:L:equFvV::d::Dh";
 // long options
 const struct option longopts[] = {
 //  { char*name, int has_arg, int *flag, int val }
@@ -29,30 +29,70 @@ const struct option longopts[] = {
     { "quiet",      no_argument,        NULL,           'q' },
     { "utc",        no_argument,        NULL,           'u' },
     { "fsync",      no_argument,        NULL,           'F' },
-    { "help",       no_argument,        NULL,           'h' },
-    { "version",    no_argument,        NULL,           'v' },
-    { "verbose",    optional_argument,  NULL,           'V' },
     { "daemon",     no_argument,        NULL,           'D' },
+    { "verbose",    optional_argument,  NULL,           'V' },
+    { "debug",      optional_argument,  NULL,           'd' },
+    { "version",    no_argument,        NULL,           'v' },
+    { "help",       no_argument,        NULL,           'h' },
 };
 // options text (for help)
 const char *helpopts[][3] = {
 //  { char*default, char*arg_help, char*description }
-    { "auto",           "auto|device [device...]",  "set serial port name, may contain wildcards or list" },
+    { "auto",           "auto|device [device...]",  "set serial port names (may contain wildcards)" },
     { "115200",         "baudrate",                 "set baud rate" },
     { "localhost:8501", "[ip/hostname]:portnum",    "set listen address"},
     { NULL,             "FILENAME",                 "log to FILENAME (may contain strftime(3) strings)" },
     { NULL,             NULL,                       "echo log to stdout (twice for stderr)" },
-    { NULL,             NULL,                       "don't echo log at all" },
+    { NULL,             NULL,                       "don't echo log" },
     { NULL,             NULL,                       "log dates as UTC"},
     { NULL,             NULL,                       "force sync after each log write"},
-    { NULL,             NULL,                       "display this help message" },
-    { NULL,             NULL,                       "display version info" },
-    { NULL,             "0-7",                      "increase or set verbosity level" },
     { NULL,             NULL,                       "detatch and fork into background" },
+    { NULL,             "0-7",                      "increase or set verbosity level" },
+    { NULL,             "0-7",                      "same as --verbose -V" },
+    { NULL,             NULL,                       "display version info" },
+    { NULL,             NULL,                       "display this help message" },
 };
 
-static int usage(FILE *out, int exitCode);
 
+#define HELP_INDENT 50
+
+static int
+usage(FILE *out, int ec) {
+    fprintf(out, "%s [ options ]\n Options:\n", HDMI2USBD_NAME);
+    for(int index =0; index < sizeof(longopts)/sizeof(struct option); index++) {
+        int len = 0;
+        switch (longopts[index].has_arg) {
+            case optional_argument:
+                len = fprintf(out, "  -%c --%s [%s]", longopts[index].val, longopts[index].name, helpopts[index][1]);
+                break;
+            case required_argument:
+                len = fprintf(out, "  -%c --%s %s", longopts[index].val, longopts[index].name, helpopts[index][1]);
+                break;
+            default:
+            case no_argument:
+                len = fprintf(out, "  -%c --%s", longopts[index].val, longopts[index].name);
+                break;
+        }
+        char const *desc = helpopts[index][2] == NULL ? "" : helpopts[index][2];
+        fprintf(out, "%*s %s\n", len > HELP_INDENT ? 0 : len - HELP_INDENT, "", desc);
+    }
+    return ec;
+}
+
+
+unsigned short
+parse_port(char *at, int *rc) {
+    unsigned short result = 0;
+    if (*at != '\0' && *(++at) != '\0') {
+        char *endptr = at;
+        result = (unsigned short) strtoul(at, &endptr, 10);
+        if (*endptr != '\0') {
+            fprintf(stderr, "invalid port number '%s'", at);
+            *rc = 2;
+        }
+    }
+    return result;
+}
 
 int
 parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
@@ -79,6 +119,7 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                 exit(0);
                 // notreached
             case 'V':
+            case 'd':
                 if (optarg == NULL)
                     opts->verbose++;
                 else {
@@ -95,7 +136,7 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                 break;
             case 's': {
                 char *endptr = optarg;
-                long baudrate = strtol(optarg, &endptr, 10);
+                unsigned long baudrate = strtoul(optarg, &endptr, 10);
                 if (endptr != NULL && *endptr == '\0') {
                     opts->baudrate = speed_to_baud(baudrate);
                     if (opts->baudrate != BINVALID)
@@ -103,27 +144,46 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                 }
                 fprintf(stderr, "invalid speed '%s'\n", optarg);
                 rc = usage(stderr, 2);
-            }
                 break;
+            }
             case 'l': {
-                char *at = strchr(optarg, ':');
-                if (at == NULL)
-                    at = optarg + strlen(optarg);
-                size_t i = at - optarg;
-                char listen_addr[i+1];
-                strncpy(listen_addr, optarg, i);
-                listen_addr[i] = '\0';
-                opts->listen_addr = strdup(listen_addr);
-                if (*at != '\0' && *(++at) != '\0') {
-                    char *endptr = at;
-                    opts->listen_port = (short)strtol(at, &endptr, 10);
-                    if (*endptr != '\0') {
-                        fprintf(stderr, "invalid port number '%s'", at);
-                        rc = usage(stderr, 2);
+                char *at, *str = optarg;
+                if (str == NULL)
+                    fprintf(stderr, "-l missing argument");
+                else if (*str == '[') {  // [address]:port sytnax
+                    at = strchr(str, ']');
+                    if (at != NULL) {
+                        size_t i = at - str - 1;
+                        ++at;
+                        if (i > 0) {
+                            char listen_addr[i + 1];
+                            strncpy(listen_addr, str + 1, i);
+                            listen_addr[i] = '\0';
+                            opts->listen_addr = strdup(listen_addr);
+                        }
+                        opts->listen_port = parse_port(at, &rc);
+                        if (!rc)
+                            break;
+                    } else
+                        fprintf(stderr, "invalid address '%s'", optarg);
+                } else {
+                    at = strchr(str, ':');
+                    if (at == NULL)
+                        at = str + strlen(str);
+                    size_t i = at - optarg;
+                    if (i > 0) {
+                        char listen_addr[i + 1];
+                        strncpy(listen_addr, optarg, i);
+                        listen_addr[i] = '\0';
+                        opts->listen_addr = strdup(listen_addr);
                     }
+                    opts->listen_port = parse_port(at, &rc);
+                    if (!rc)
+                        break;
                 }
-            }
+                rc = usage(stderr, 2);
                 break;
+            }
             case 'p': {
                 const char *args[MAX_SERIAL_SPECS + 1];
                 int count = 0, index = optind - 1;
@@ -135,7 +195,7 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                 }
                 optind = index - 1;
                 if (count > 0) {
-                    int length =0;
+                    size_t length =0;
                     for (int i =0; i < count; i++)
                         length += strlen(args[i]) + 1;
                     char *ports = malloc(length);
@@ -175,6 +235,8 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
             case 'F':
                 opts->logflags |= LOG_SYNC;
                 break;
+            default:
+                fprintf(stderr, "parameter -%c is not being handled", r);
             case ':':
             case '?':
                 rc = usage(stderr, 1);
@@ -184,29 +246,6 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
     return rc;
 }
 
-#define HELP_INDENT 50
-
-static int
-usage(FILE *out, int ec) {
-    fprintf(out, "%s [ options ]\n Options:\n", HDMI2USBD_NAME);
-    for(int index =0; index < sizeof(longopts)/sizeof(struct option); index++) {
-        int len = 0;
-        switch (longopts[index].has_arg) {
-            case no_argument:
-                len = fprintf(out, "  -%c --%s", longopts[index].val, longopts[index].name);
-                break;
-            case optional_argument:
-                len = fprintf(out, "  -%c --%s [%s]", longopts[index].val, longopts[index].name, helpopts[index][1]);
-                break;
-            case required_argument:
-                len = fprintf(out, "  -%c --%s %s", longopts[index].val, longopts[index].name, helpopts[index][1]);
-                break;
-        }
-        char const *desc = helpopts[index][2] == NULL ? "" : helpopts[index][2];
-        fprintf(out, "%*s %s\n", len > HELP_INDENT ? 0 : len - HELP_INDENT, "", desc);
-    }
-    return ec;
-}
 
 int
 main(int argc, char * const *argv) {
@@ -214,13 +253,21 @@ main(int argc, char * const *argv) {
 
     int rc = parse_args(argc, argv, &app.opts);
     if (rc == 0) {
-        log_init(app.opts.logflags, app.opts.verbose, app.opts.logfile);
-        log_debug("      Device : %s", app.opts.port);
-        log_debug("    Baudrate : %ld", baud_to_speed(app.opts.baudrate));
-        log_debug("Bind Address : %s", app.opts.listen_addr);
-        log_debug("   Bind Port : %u", app.opts.listen_port);
-        log_debug("   Daemonize : %s", app.opts.daemonize ? "Yes" : "No");
-        log_debug("   Verbosity : %d", app.opts.verbose);
+        log_init(app.opts.logflags,
+                 (enum Verbosity)app.opts.verbose,
+                 app.opts.logfile);
+        log_info("%s version %s starting", HDMI2USBD_NAME, HDMI2USBD_VERSION);
+        log_debug("       Device : %s", app.opts.port);
+        log_debug("     Baudrate : %ld", baud_to_speed(app.opts.baudrate));
+        log_debug(" Bind Address : %s", app.opts.listen_addr);
+        log_debug("    Bind Port : %u", app.opts.listen_port);
+        log_debug("   Logging To : %s", app.opts.logfile ? app.opts.logfile : "<not set>");
+        log_debug("Log Verbosity : %d", app.opts.verbose);
+        log_debug("    Log Times : %s", app.opts.logflags & LOG_UTC ? "UTC" : "Local");
+        log_debug("     Log Sync : %s", app.opts.logflags & LOG_SYNC ? "enabled" : "disabled");
+        log_debug("    Daemonize : %s", app.opts.daemonize ? "Yes" : "No");
+        rc = hdmi2usb_main(&app);
+        log_message(rc == 0 ? V_INFO : V_CRITICAL, "%s ended (exitcode=%d", HDMI2USBD_NAME, rc);
     }
     return rc;
 }
