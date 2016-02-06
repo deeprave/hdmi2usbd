@@ -5,10 +5,10 @@
 #ifndef GENERIC_SERIAL_H
 #define GENERIC_SERIAL_H
 
-#define BINVALID -1L
+#define BINVALID ((unsigned long)-1)
 
-long speed_to_baud(long speed);
-long baud_to_speed(long baud);
+unsigned long baud_to_speed(unsigned long baud);
+unsigned long speed_to_baud(unsigned long speed);
 
 #include "iodev.h"
 
@@ -17,9 +17,11 @@ typedef struct serial_cfg_s serial_cfg_t;
 struct serial_cfg_s {
     iodev_cfg_t cfg;
     char const *portname;
-    long baudrate;
+    unsigned long baudrate;
+    struct termios *termctl;
 };
 
 extern serial_cfg_t *serial_getcfg(iodev_t *sdev);
+extern iodev_t *serial_create(char const *devname, unsigned long baudrate, size_t bufsize);
 
 #endif //GENERIC_SERIAL_H
