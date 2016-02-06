@@ -17,6 +17,7 @@ enum devState {
     IODEV_NONE,             // default state
     IODEV_INACTIVE,         // closed, do not open
     IODEV_CLOSED,           // closed (queue for open)
+    IODEV_CLOSING,          // closing (draining)
     IODEV_PENDING,          // waiting for open to complete
     IODEV_OPEN,             // open, inactive, idle
     IODEV_CONNECTED,        // open, active, connected or listening
@@ -56,7 +57,7 @@ struct iodev_s {
     buffer_t tbuf;
 
     // device control
-    int (*open)(iodev_t *dev, char const *data, int listen);
+    int (*open)(iodev_t *dev);
     void (*close)(iodev_t *dev, int flags);
     int (*configure)(iodev_t *dev, void *data);
 
@@ -67,10 +68,6 @@ struct iodev_s {
     int (*read)(iodev_t *dev, void *buf, size_t len);
     int (*write)(iodev_t *dev, void const *buf, size_t len);
 
-    // Errors & notifications
-    int (*errfunc)(char const *fmt, va_list args);
-    int (*notify)(char const *fmt, va_list args);
-
 };
 
 
@@ -79,13 +76,19 @@ const char *iodev_name(iodev_t *iodev);
 int iodev_getstate(iodev_t *dev);
 int iodev_setstate(iodev_t *dev, int state);
 int iodev_getfd(iodev_t *dev);
-void iodev_seterrfunc(iodev_t *dev, int (*func)(char const *fmt, va_list args));
-void iodev_setnotify(iodev_t *dev, int (*func)(char const *fmt, va_list args));
+buffer_t *iodev_tbuf(iodev_t *dev);
+buffer_t *iodev_rbuf(iodev_t *dev);
+
+void iodev_seterrfunc(int (*func)(char const *fmt, va_list args));
+void iodev_setnotify(int (*func)(char const *fmt, va_list args));
+
+int iodev_error(char const *fmt, ...) __attribute__((format (printf, 1, 2)));
+int iodev_notify(char const *fmt, ...) __attribute__((format (printf, 1, 2)));
 
 extern iodev_t *iodev_create(iodev_cfg_t *cfg, size_t bufsize);
 extern void iodev_free(iodev_t *dev);
 
-extern int iodev_open(iodev_t *dev, char const *data, int listen);
+extern int iodev_open(iodev_t *dev);
 extern void iodev_close(iodev_t *dev, int flags);
 extern int iodev_configure(iodev_t *dev, void *data);
 extern int iodev_read_handler(iodev_t *dev);

@@ -9,6 +9,71 @@
 #include "iodev.h"
 
 
+iodev_cfg_t *iodev_getcfg(iodev_t *iodev) { return iodev->cfg; }
+const char *iodev_name(iodev_t *iodev) { return iodev->cfg->name; }
+int iodev_getstate(iodev_t *dev) { return dev->state; }
+int iodev_setstate(iodev_t *dev, int state) { return dev->state = state; }
+int iodev_getfd(iodev_t *dev) { return dev->fd; }
+buffer_t *iodev_tbuf(iodev_t *dev) { return &dev->tbuf; }
+buffer_t *iodev_rbuf(iodev_t *dev) { return &dev->rbuf; }
+
+
+// Error message handling
+
+static int
+iodev_error_default(char const *fmt, va_list args) {
+    char _fmt[strlen(fmt)+2];
+    strcpy(_fmt, fmt);
+    strcat(_fmt, "\n");
+    return vfprintf(stderr, _fmt, args);
+}
+
+static int
+iodev_notify_default(char const *fmt, va_list args) {
+    char _fmt[strlen(fmt)+2];
+    strcpy(_fmt, fmt);
+    strcat(_fmt, "\n");
+    return vfprintf(stdout, _fmt, args);
+}
+
+static int (*iodev_errfunc)(char const *fmt, va_list args) = iodev_error_default;
+static int (*iodev_notifyfunc)(char const *fmt, va_list args) = iodev_notify_default;
+
+void
+iodev_seterrfunc(int (*func)(char const *fmt, va_list args)) {
+    iodev_errfunc = func;
+}
+
+void
+iodev_setnotify(int (*func)(char const *fmt, va_list args)) {
+    iodev_notifyfunc = func;
+}
+
+int
+iodev_error(char const *fmt, ...) {
+    va_list arg;
+    va_start(arg, fmt);
+    int rc = iodev_errfunc(fmt, arg);
+    va_end(arg);
+    return rc;
+}
+
+int
+iodev_notify(char const *fmt, ...) {
+    va_list arg;
+    va_start(arg, fmt);
+    int rc = iodev_notifyfunc(fmt, arg);
+    va_end(arg);
+    return rc;
+}
+
+static int
+not_implemented(iodev_t *dev, char const *name) {
+    return iodev_error("unimplemented function '%s' called, device = %s", name, iodev_name(dev));
+}
+
+
+
 iodev_cfg_t *
 alloc_cfg(size_t size, const char *name, int listener) {
     iodev_cfg_t *cfg = calloc(1, size);
@@ -16,33 +81,6 @@ alloc_cfg(size_t size, const char *name, int listener) {
     cfg->fd = -1;
     cfg->listener = listener;
     return cfg;
-}
-
-iodev_cfg_t *iodev_getcfg(iodev_t *iodev) { return iodev->cfg; }
-const char *iodev_name(iodev_t *iodev) { return iodev->cfg->name; }
-int iodev_getstate(iodev_t *dev) { return dev->state; }
-int iodev_setstate(iodev_t *dev, int state) { return dev->state = state; }
-int iodev_getfd(iodev_t *dev) { return dev->fd; }
-void iodev_seterrfunc(iodev_t *dev, int (*func)(char const *fmt, va_list args)) { dev->errfunc = func; }
-void iodev_setnotify(iodev_t *dev, int (*func)(char const *fmt, va_list args)) { dev->notify = func; }
-
-// default error & notification functions
-
-static int
-iodev_error(char const *fmt, va_list args) {
-    char _fmt[strlen(fmt)+2];
-    strcpy(_fmt, fmt);
-    strcat(_fmt, "\n");
-    return vfprintf(stderr, _fmt, args);
-}
-
-
-static int
-iodev_notify(char const *fmt, va_list args) {
-    char _fmt[strlen(fmt)+2];
-    strcpy(_fmt, fmt);
-    strcat(_fmt, "\n");
-    return vfprintf(stdout, _fmt, args);
 }
 
 
@@ -56,8 +94,6 @@ iodev_create(iodev_cfg_t *cfg, size_t bufsize) {
     dev->state = IODEV_NONE;
     buffer_init(&dev->rbuf, bufsize);
     buffer_init(&dev->rbuf, bufsize);
-    dev->errfunc = iodev_error;
-    dev->notify = iodev_notify;
     return dev;
 }
 
@@ -70,27 +106,11 @@ iodev_free(iodev_t *dev) {
 }
 
 
-static int
-error_message(iodev_t *dev, char const *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    int rc = dev->errfunc(fmt, args);
-    va_end(args);
-    return rc;
-}
-
-
-static int
-not_implemented(iodev_t *dev, char const *name) {
-    return error_message(dev, "called unimplemented function: '%s' in %s device", name, iodev_name(dev));
-}
-
-
-// redirect to device routines
+// redirect to device-specific routines
 
 int
-iodev_open(iodev_t *dev, char const *data, int listen) {
-    return dev->open ? dev->open(dev, data, listen) : not_implemented(dev, "open");
+iodev_open(iodev_t *dev) {
+    return dev->open ? dev->open(dev) : not_implemented(dev, "open");
 }
 
 void
