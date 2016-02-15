@@ -31,7 +31,6 @@ set(HDMI2USBD_SOURCE_FILES
 
 add_executable(hdmi2usbd
         src/main.c
-        src/sockets.c
         ${HDMI2USBD_SOURCE_FILES}
         ${SUPPORT_SOURCE_FILES})
 
@@ -52,23 +51,16 @@ if (tests)
     # unit tests
     ####
 
-    add_executable(runMiscUnitTests
+    add_executable(runUnitTests
             ${HDMI2USBD_SOURCE_FILES}
             ${SUPPORT_SOURCE_FILES}
-            tests/misc/test_logging.cc
-            tests/misc/test_array.cc
-            tests/misc/test_buffer.cc
-            tests/misc/test_ipaddrs.cc)
+            tests/test_logging.cc
+            tests/test_array.cc
+            tests/test_buffer.cc
+            tests/test_ipaddrs.cc
+            tests/test_find_serial.cc)
 
-    target_link_libraries(runMiscUnitTests gtest gtest_main)
-    add_test(misc_tests runMiscUnitTests)
-
-    add_executable(runSerialUnitTests
-            ${HDMI2USBD_SOURCE_FILES}
-            ${SUPPORT_SOURCE_FILES}
-            tests/serial/test_find_serial.cc)
-
-    target_link_libraries(runSerialUnitTests gtest gtest_main)
-    add_test(serial_interface runSerialUnitTests)
+    target_link_libraries(runUnitTests gtest gtest_main)
+    add_test(unit_tests runUnitTests)
 
 endif()

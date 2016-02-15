@@ -164,11 +164,13 @@ selector_ioset(selector_t *selector, fd_set *r, fd_set *w, fd_set *x) {
     return stat;
 }
 
+
 static int
 selector_dispatch(selector_t *selector, int ready, fd_set *rd_set, fd_set *wr_set, fd_set *ex_set) {
     int rc = 0;
     return rc;
 }
+
 
 static void
 selector_debug(selector_t *selector, int result, int error, fd_set *rd_set, fd_set *wr_set, fd_set *ex_set) {
