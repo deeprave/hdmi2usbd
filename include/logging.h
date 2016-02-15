@@ -13,9 +13,9 @@ enum Verbosity {
     V_FATAL,
     V_CRITICAL,
     V_ERROR,
-    V_DEFAULT = V_ERROR,
     V_WARN,
     V_INFO,
+    V_DEFAULT = V_INFO,
     V_DEBUG,
     V_TRACE,
     V_MAX = V_TRACE

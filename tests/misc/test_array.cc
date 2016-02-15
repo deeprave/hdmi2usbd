@@ -11,6 +11,20 @@ extern "C" {
 
 namespace {
 
+    // error message thunk, redirects to logging framework
+    extern "C" int
+    array_error(char const *fmt, va_list args) {
+        return log_log(V_ERROR, fmt, args);
+    }
+
+    class ArrayFunctions : public ::testing::Test {
+    protected:
+        void SetUp() {
+            // Set the error message handler
+            array_seterrfunc(array_error);
+        }
+    };
+
     struct element {
         size_t number;
     };
@@ -18,7 +32,7 @@ namespace {
     #define I 8
     #define N (I * 5 + 1)
 
-    TEST(ArrayFunctions, arrayCreationAuto) {
+    TEST_F(ArrayFunctions, arrayCreationAuto) {
         // allocate on stack
         array_t A = {};
         array_init(&A, sizeof(element), I); // init must be called in this case
@@ -39,7 +53,7 @@ namespace {
         EXPECT_EQ(A.data, (void*)0);
     };
 
-    TEST(ArrayFunctions, arrayCreateHeap) {
+    TEST_F(ArrayFunctions, arrayCreateHeap) {
         // allocate on heap
         array_t *A = array_alloc(sizeof(element), I);   // init already done
         EXPECT_EQ(0, array_count(A));
@@ -57,22 +71,14 @@ namespace {
         // Cannot query A further due to deallication
     }
 
-    // error message thunk, redirects to logging framework
-    extern "C" int
-    array_error(char const *fmt, va_list args) {
-        return log_log(V_ERROR, fmt, args);
-    }
-
-    TEST(ArrayFunctions, arrayErrorFunction) {
+    TEST_F(ArrayFunctions, arrayErrorFunction) {
         array_t A = {};
-        // Set the error message handler
-        array_seterrfunc(array_error);
         // Now generate an error, same as above
         EXPECT_EQ((void *)0, array_get(&A, 0));
         array_free(&A);
     }
 
-    TEST(ArrayFunctions, arrayNewAndAppend) {
+    TEST_F(ArrayFunctions, arrayNewAndAppend) {
         array_t * A = array_alloc(sizeof(element), I);
         // Build an array of elements
         for (size_t i=0; i < N; i++) {
@@ -97,7 +103,7 @@ namespace {
         array_free(A);
     }
 
-    TEST(ArrayFunctions, arrayInsertNewAt) {
+    TEST_F(ArrayFunctions, arrayInsertNewAt) {
         array_t * A = array_alloc(sizeof(element), I);
         // Build an array of elements, inserting at start
         for (size_t i=0; i < N; i++) {
@@ -121,7 +127,7 @@ namespace {
         array_free(A);
     }
 
-    TEST(ArrayFunctions, arrayDelete) {
+    TEST_F(ArrayFunctions, arrayDelete) {
         array_t * A = array_alloc(sizeof(element), I);
         for (size_t i=0; i < N; i++) {
             element e = {i};
@@ -153,7 +159,7 @@ namespace {
         array_free(A);
     }
 
-    TEST(ArrayFunctions, arrayIndexAndPut) {
+    TEST_F(ArrayFunctions, arrayIndexAndPut) {
         array_t * A = array_alloc(sizeof(element), I);
         for (size_t i=0; i < N; i++) {
             element e = {i};

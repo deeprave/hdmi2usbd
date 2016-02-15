@@ -5,6 +5,8 @@
 #ifndef HDMI2USBD_HDMI2USBD_H
 #define HDMI2USBD_HDMI2USBD_H
 
+#include "selector.h"
+
 #define HDMI2USBD_VERSION "0.1"
 #define HDMI2USBD_NAME "hdmi2usbd"
 
@@ -21,23 +23,20 @@ struct hdmi2usb_opts {
     char const *port;
     char const *listen_addr;
     unsigned short listen_port;
+    int listen_flags;
+    unsigned iobufsize;
+    unsigned long loop_time;
 };
 
 // working data
 struct hdmi2usb {
     struct hdmi2usb_opts opts;
+    selector_t selector;
+    iodev_t *serial;
+    iodev_t *listen[2];
 };
 
 
-// controller serial device llist node
-struct ctrldev {
-    struct ctrldev *next;
-    char *devname;
-};
-
-struct ctrldev *find_serial_all(const struct hdmi2usb_opts *opts);
-void ctrldev_free(struct ctrldev *first_dev);
-char *find_serial(const struct hdmi2usb_opts *opts);
 int hdmi2usb_main(struct hdmi2usb *app);
 
 #endif //HDMI2USBD_HDMI2USBD_H

@@ -22,6 +22,6 @@ struct serial_cfg_s {
 };
 
 extern serial_cfg_t *serial_getcfg(iodev_t *sdev);
-extern iodev_t *serial_create(char const *devname, unsigned long baudrate, size_t bufsize);
+extern iodev_t *serial_create(iodev_t *dev, char const *devname, unsigned long baudrate, size_t bufsize);
 
 #endif //GENERIC_SERIAL_H

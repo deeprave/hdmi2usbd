@@ -3,43 +3,34 @@
 //
 
 
-extern "C" {
-#include "hdmi2usbd.h"
-}
-
-#include "logging.h"
 #include "gtest/gtest.h"
+
+extern "C" {
+#include "device.h"
+#include "logging.h"
+}
 
 namespace {
 
     static const char portlist[] = "/dev/ttyVIZ*|ttyACM*|/dev/tty*";
-    static const char host[] = "localhost";
-
-    struct hdmi2usb_opts opts = {
-        V_NONE,                             // verbose
-        0,                                  // logflags
-        NULL,                               // logfile
-        0,                                  // daemonize
-        115200,                             // baudrate
-        portlist,                           // port
-        host,                               // listen_addr
-        8501,                               // listen_port
-    };
 
     TEST(SerialFunctions, findSerialAll) {
-        struct ctrldev *first_dev = find_serial_all(&opts);
+        log_info("Searching for devices matching '%s'", portlist);
+        struct ctrldev *first_dev = find_serial_all(portlist);
         // assuming we are running on a unix like system
         EXPECT_NE((struct ctrldev *)0, first_dev);
         for (struct ctrldev *next = first_dev; next != NULL; next = next->next) {
             ASSERT_NE((char *)0, next->devname);
+            log_info("Found %s", next->devname);
             EXPECT_EQ(0, access(next->devname, R_OK|W_OK));
         }
     };
 
     TEST(SerialFunctions, findSerial) {
-        char *ctrl_dev = find_serial(&opts);
+        char *ctrl_dev = find_serial(portlist);
         EXPECT_NE((char *)0, ctrl_dev);
         EXPECT_EQ(0, access(ctrl_dev, R_OK|W_OK));
+        log_info("Selected device %s", ctrl_dev);
     }
 
 } // namespace

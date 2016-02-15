@@ -10,6 +10,7 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 
 #include "hdmi2usbd.h"
 #include "logging.h"
@@ -17,18 +18,21 @@
 
 
 // short options
-const char shortopts[] = "p:s:l:L:equFvV::d::Dh";
+const char shortopts[] = "p:s:l:b:L:equF46vV::d::Dh";
 // long options
 const struct option longopts[] = {
 //  { char*name, int has_arg, int *flag, int val }
     { "port",       required_argument,  NULL,           'p' },
     { "speed",      required_argument,  NULL,           's' },
+    { "bufsize",    required_argument,  NULL,           'b' },
     { "listen",     required_argument,  NULL,           'l' },
     { "log",        required_argument,  NULL,           'L' },
     { "echo",       no_argument,        NULL,           'e' },
     { "quiet",      no_argument,        NULL,           'q' },
     { "utc",        no_argument,        NULL,           'u' },
     { "fsync",      no_argument,        NULL,           'F' },
+    { "inet4",      no_argument,        NULL,           '4' },
+    { "inet6",      no_argument,        NULL,           '6' },
     { "daemon",     no_argument,        NULL,           'D' },
     { "verbose",    optional_argument,  NULL,           'V' },
     { "debug",      optional_argument,  NULL,           'd' },
@@ -40,12 +44,15 @@ const char *helpopts[][3] = {
 //  { char*default, char*arg_help, char*description }
     { "auto",           "auto|device [device...]",  "set serial port names (may contain wildcards)" },
     { "115200",         "baudrate",                 "set baud rate" },
+    { "2048",           "buffer_size",              "set default iobuffer size" },
     { "localhost:8501", "[ip/hostname]:portnum",    "set listen address"},
     { NULL,             "FILENAME",                 "log to FILENAME (may contain strftime(3) strings)" },
     { NULL,             NULL,                       "echo log to stdout (twice for stderr)" },
     { NULL,             NULL,                       "don't echo log" },
     { NULL,             NULL,                       "log dates as UTC"},
-    { NULL,             NULL,                       "force sync after each log write"},
+    { NULL,             NULL,                       "force sync after each log write" },
+    { NULL,             NULL,                       "listen on only ipv4 address(es)" },
+    { NULL,             NULL,                       "listen on only ipv6 address(es)" },
     { NULL,             NULL,                       "detatch and fork into background" },
     { NULL,             "0-7",                      "increase or set verbosity level" },
     { NULL,             "0-7",                      "same as --verbose -V" },
@@ -99,16 +106,6 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
     int rc =0, r =0;
     int longindex = 0;
 
-    // Defauts
-    opts->verbose = 0;
-    opts->logflags = 0;
-    opts->logfile = NULL;
-    opts->daemonize = 0;
-    opts->baudrate = speed_to_baud(115200);
-    opts->port = "auto";
-    opts->listen_addr = "localhost";
-    opts->listen_port = 8501;
-
     while (rc == 0 && (r = getopt_long(argc, argv, shortopts, longopts, &longindex)) != EOF) {
         switch (r) {
             case 'h':
@@ -131,6 +128,12 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                     }
                 }
                 break;
+            case '4':
+                opts->logflags ^= AF_INET;
+                break;
+            case '6':
+                opts->logflags ^= AF_INET6;
+                break;
             case 'D':
                 opts->daemonize = 1;
                 break;
@@ -143,6 +146,17 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                         break;
                 }
                 fprintf(stderr, "invalid speed '%s'\n", optarg);
+                rc = usage(stderr, 2);
+                break;
+            }
+            case 'b': {
+                char *endptr = optarg;
+                unsigned bufsize = (unsigned)strtoul(optarg, &endptr, 10);
+                if (endptr != NULL && *endptr == '\0') {
+                    opts->iobufsize = bufsize;
+                    break;
+                }
+                fprintf(stderr, "invalid buffsize '%s'\n", optarg);
                 rc = usage(stderr, 2);
                 break;
             }
@@ -243,31 +257,48 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                 break;
         }
     }
+    if (opts->logflags & AF_INET6 && opts->logflags & AF_INET)
+        opts->logflags &= ~(AF_INET|AF_INET6);
     return rc;
 }
 
 
 int
 main(int argc, char * const *argv) {
-    struct hdmi2usb app = {};
+    struct hdmi2usb app = {
+        .opts = {  // Defauts
+            .verbose = 0,
+            .logflags = 0,
+            .logfile = NULL,
+            .daemonize = 0,
+            .baudrate = speed_to_baud(115200),
+            .port = "auto",
+            .iobufsize = 2048,
+            .listen_addr = "localhost",
+            .listen_port = 8501,
+            .listen_flags = 0,
+            .loop_time = 1000U,
+        }
+    };
 
     int rc = parse_args(argc, argv, &app.opts);
     if (rc == 0) {
         log_init(app.opts.logflags,
                  (enum Verbosity)app.opts.verbose,
                  app.opts.logfile);
-        log_info("%s version %s starting", HDMI2USBD_NAME, HDMI2USBD_VERSION);
+        log_critical("%s version %s starting", HDMI2USBD_NAME, HDMI2USBD_VERSION);
         log_debug("       Device : %s", app.opts.port);
         log_debug("     Baudrate : %ld", baud_to_speed(app.opts.baudrate));
         log_debug(" Bind Address : %s", app.opts.listen_addr);
         log_debug("    Bind Port : %u", app.opts.listen_port);
+        log_debug(" I/O Buffsize : %u", app.opts.iobufsize);
         log_debug("   Logging To : %s", app.opts.logfile ? app.opts.logfile : "<not set>");
         log_debug("Log Verbosity : %d", app.opts.verbose);
         log_debug("    Log Times : %s", app.opts.logflags & LOG_UTC ? "UTC" : "Local");
         log_debug("     Log Sync : %s", app.opts.logflags & LOG_SYNC ? "enabled" : "disabled");
         log_debug("    Daemonize : %s", app.opts.daemonize ? "Yes" : "No");
         rc = hdmi2usb_main(&app);
-        log_message(rc == 0 ? V_INFO : V_CRITICAL, "%s ended (exitcode=%d", HDMI2USBD_NAME, rc);
+        log_critical("%s ended (exitcode=%d)", HDMI2USBD_NAME, rc);
     }
     return rc;
 }

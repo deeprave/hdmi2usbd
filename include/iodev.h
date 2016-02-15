@@ -24,78 +24,79 @@ enum devState {
     IODEV_ACTIVE            // open, active, communicating
 };
 
-enum devFlags {
-    IOFLAG_NONE = 0x00,
-    IOFLAG_FLUSH = 0x01,
-    IOFLAG_INACTIVE = 0x02,
+enum closeFlags {
+    IOFLAG_NONE = 0x00,     // no special handling
+    IOFLAG_FLUSH = 0x01,    // send or drain data before close
+    IOFLAG_INACTIVE = 0x02, // final close -> inactive (do not reopen)
 };
-
-typedef struct iodev_cfg_s iodev_cfg_t;
-
-struct iodev_cfg_s {
-    const char *name;
-    int fd;
-    int listener;
-} device_cfg;
-
-iodev_cfg_t *alloc_cfg(size_t size, const char *name, int listener);
-void free_cfg(iodev_cfg_t *cfg);
-
 
 typedef struct iodev_s iodev_t;
 typedef struct selector_s selector_t;
+typedef struct iodev_cfg_s iodev_cfg_t;
+
+struct iodev_cfg_s {
+    const char *name;       // driver identifier
+    void (*free_cfg)(iodev_cfg_t *);
+};
+
+iodev_cfg_t *iodev_alloc_cfg(size_t size, const char *name, void (*free_cfg)(iodev_cfg_t*));
+void iodev_free_cfg(iodev_cfg_t *cfg);
+
 
 struct iodev_s {
 
-    iodev_cfg_t *cfg;
-
-    int fd;
-    selector_t *selector;
-
-    int state;
-    buffer_t rbuf;
-    buffer_t tbuf;
+    unsigned int alloc;         // allocation marker
+    iodev_cfg_t *cfg;           // device configuration
+    selector_t *selector;       // selector / handler
+    int fd;                     // file descriptor / socket
+    int listener;               // non-zero = listener
+    int state;                  // current state
+    size_t bufsize;             // default buffer size (accept sockets)
+    buffer_t rbuf;              // receive buffer
+    buffer_t tbuf;              // transmit buffer
 
     // device control
     int (*open)(iodev_t *dev);
     void (*close)(iodev_t *dev, int flags);
     int (*configure)(iodev_t *dev, void *data);
 
-    // I/O
-    int (*read_handler)(iodev_t *dev);
-    int (*write_handler)(iodev_t *dev);
-    int (*except_handler)(iodev_t *dev);
-    int (*read)(iodev_t *dev, void *buf, size_t len);
-    int (*write)(iodev_t *dev, void const *buf, size_t len);
+    // raw I/O
+    ssize_t (*read_handler)(iodev_t *dev);
+    ssize_t (*write_handler)(iodev_t *dev);
+    ssize_t (*except_handler)(iodev_t *dev);
+
+    // buffered I/O
+    ssize_t (*read)(iodev_t *dev, void *buf, size_t len);
+    ssize_t (*write)(iodev_t *dev, void const *buf, size_t len);
 
 };
 
 
-iodev_cfg_t *iodev_getcfg(iodev_t *iodev);
-const char *iodev_name(iodev_t *iodev);
-int iodev_getstate(iodev_t *dev);
-int iodev_setstate(iodev_t *dev, int state);
-int iodev_getfd(iodev_t *dev);
-buffer_t *iodev_tbuf(iodev_t *dev);
-buffer_t *iodev_rbuf(iodev_t *dev);
+extern iodev_cfg_t *iodev_getcfg(iodev_t *iodev);
+extern const char *iodev_driver(iodev_t *iodev);
 
-void iodev_seterrfunc(int (*func)(char const *fmt, va_list args));
-void iodev_setnotify(int (*func)(char const *fmt, va_list args));
+extern int iodev_getfd(iodev_t *dev);
+extern int is_listener(iodev_t *dev);
 
-int iodev_error(char const *fmt, ...) __attribute__((format (printf, 1, 2)));
-int iodev_notify(char const *fmt, ...) __attribute__((format (printf, 1, 2)));
+extern int iodev_getstate(iodev_t *dev);
+extern int iodev_setstate(iodev_t *dev, int state);
 
-extern iodev_t *iodev_create(iodev_cfg_t *cfg, size_t bufsize);
+extern buffer_t *iodev_tbuf(iodev_t *dev);
+extern buffer_t *iodev_rbuf(iodev_t *dev);
+
+extern selector_t *getselector(iodev_t *dev);
+extern void setselector(iodev_t *dev, selector_t *selector);
+
+extern void iodev_seterrfunc(int (*func)(char const *fmt, va_list args));
+extern void iodev_setnotify(int (*func)(char const *fmt, va_list args));
+
+extern int iodev_error(char const *fmt, ...) __attribute__((format (printf, 1, 2)));
+extern int iodev_notify(char const *fmt, ...) __attribute__((format (printf, 1, 2)));
+
+extern iodev_t *iodev_init(iodev_t *dev, iodev_cfg_t *cfg, size_t bufsize);
 extern void iodev_free(iodev_t *dev);
 
-extern int iodev_open(iodev_t *dev);
-extern void iodev_close(iodev_t *dev, int flags);
-extern int iodev_configure(iodev_t *dev, void *data);
-extern int iodev_read_handler(iodev_t *dev);
-extern int iodev_write_handler(iodev_t *dev);
-extern int iodev_except_handler(iodev_t *dev);
-
-extern int iodev_read(iodev_t *dev, void *buf, size_t len);
-extern int iodev_write(iodev_t *dev, void const *buf, size_t len);
+extern ssize_t iodev_write(iodev_t *dev, void const *buf, size_t len);
+extern ssize_t iodev_read(iodev_t *dev, void *buf, size_t len);
 
 #endif //GENERIC_IODEV_H

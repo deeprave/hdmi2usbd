@@ -129,6 +129,31 @@ buffer_put(buffer_t *buffer, void const *buf, size_t len) {
 
 
 size_t
+buffer_peek(buffer_t *buffer, void *buf, size_t len) {
+    size_t avail = buffer_used(buffer);
+    if (len > avail)    // partial put only if insufficient data
+        len = avail;
+    else
+        avail = len;
+    size_t lo = buffer->b_lo;
+    size_t hi = buffer->b_hi;
+    if (lo > hi) {
+        size_t top = buffer->b_size - lo;
+        if (top > avail)
+            top = avail;
+        if (top)
+            memcpy(buf, buffer->data + lo, top);
+        buf += top;
+        avail -= top;
+        lo = buffer_inc(buffer, lo, top);
+    }
+    if (avail)
+        memcpy(buf, buffer->data + lo, avail);
+    return len;
+}
+
+
+size_t
 buffer_get(buffer_t *buffer, void *buf, size_t len) {
     size_t avail = buffer_used(buffer);
     if (len > avail)    // partial put only if insufficient data
@@ -139,14 +164,16 @@ buffer_get(buffer_t *buffer, void *buf, size_t len) {
         size_t top = buffer->b_size - buffer->b_lo;
         if (top > avail)
             top = avail;
-        if (top)
+        if (top && buf) {
             memcpy(buf, buffer->data + buffer->b_lo, top);
+            buf += top;
+        }
         avail -= top;
-        buf += top;
         buffer->b_lo = buffer_inc(buffer, buffer->b_lo, top);
     }
     if (avail) {
-        memcpy(buf, buffer->data + buffer->b_lo, avail);
+        if (buf)
+            memcpy(buf, buffer->data + buffer->b_lo, avail);
         buffer->b_lo = buffer_inc(buffer, buffer->b_lo, avail);
     }
     return len;

@@ -78,25 +78,25 @@ serial_open(iodev_t *dev) {
     serial_cfg_t *cfg = serial_getcfg(dev);
 
     if (iodev_getstate(dev) >= IODEV_OPEN)
-        iodev_close(dev, IOFLAG_NONE);
+        dev->close(dev, IOFLAG_NONE);
 
     int opts = O_NONBLOCK | O_NOCTTY | O_RDWR;
     dev->fd = open(cfg->portname, opts);
     if (dev->fd == -1) { // failed
-        iodev_error(dev, "serial open '%s' (%d): %s", cfg->portname, errno, strerror(errno));
+        iodev_error("serial open '%s' (%d): %s", cfg->portname, errno, strerror(errno));
     } else {
         iodev_setstate(dev, IODEV_OPEN);
         if (tcsetattr(dev->fd, TCSANOW, cfg->termctl) == -1)
-            iodev_error(dev, "serial setup '%s' (%d): %s", cfg->portname, errno, strerror(errno));
+            iodev_error("serial setup '%s' (%d): %s", cfg->portname, errno, strerror(errno));
         else {
             if (ioctl(dev->fd, TIOCCBRK) == -1)
-                iodev_notify(dev, "ioctl(TIOCCBRK) '%s' (%d): %s", cfg->portname, errno, strerror(errno));
+                iodev_notify("ioctl(TIOCCBRK) '%s' (%d): %s", cfg->portname, errno, strerror(errno));
             // set serial devices directly to "connected" state after successfully opened
             iodev_setstate(dev, IODEV_CONNECTED);
             return dev->fd;
         }
         // error fallthrough
-        iodev_close(dev, IOFLAG_NONE);
+        dev->close(dev, IOFLAG_NONE);
     }
     return dev->fd;
 }
@@ -110,7 +110,7 @@ serial_close(iodev_t *dev, int flags) {
         case IODEV_NONE:
         case IODEV_INACTIVE:
         case IODEV_CLOSED:
-            iodev_notify(dev, "serial close '%s' already closed", cfg->portname);
+            iodev_notify("serial close: %s is already closed", cfg->portname);
             // do nothing for these states, we are already closed
             break;
         default:
@@ -138,41 +138,11 @@ serial_configure(iodev_t *dev, void *data) {
 }
 
 
-static int
-serial_read_handler(iodev_t *dev) {
-    return 0;
-}
-
-
-static int
-serial_write_handler(iodev_t *dev) {
-    return 0;
-}
-
-
-static int
-serial_except_handler(iodev_t *dev) {
-    return 0;
-}
-
-
-static int
-serial_read(iodev_t *dev, void *buf, size_t len) {
-    return 0;
-}
-
-
-static int
-serial_write(iodev_t *dev, void const *buf, size_t len) {
-    return 0;
-}
-
-
 iodev_t *
-serial_create(char const *devname, unsigned long baudrate, size_t bufsize) {
+serial_create(iodev_t *dev, char const *devname, unsigned long baudrate, size_t bufsize) {
     // First create the basic (slightly larger) config
-    iodev_cfg_t *cfg = alloc_cfg(sizeof(serial_cfg_t), "serial", 0);
-    iodev_t *serial = iodev_create(cfg, bufsize);
+    iodev_cfg_t *cfg = iodev_alloc_cfg(sizeof(serial_cfg_t), "serial", NULL);
+    iodev_t *serial = iodev_init(dev, cfg, bufsize);
 
     // Initialise the extras
     serial_cfg_t *scfg = serial_getcfg(serial);
@@ -184,14 +154,8 @@ serial_create(char const *devname, unsigned long baudrate, size_t bufsize) {
     cfmakeraw(termctl);
     cfsetospeed(termctl, (speed_t)scfg->baudrate);
     cfsetispeed(termctl, (speed_t)scfg->baudrate);
-    termctl->c_cflag &= ~(CSTOPB);
-    termctl->c_cflag &= ~(CSIZE);
-    termctl->c_cflag |= CS8;
-    termctl->c_cflag &= ~(PARENB);
-    termctl->c_cflag &= ~(CLOCAL);
-    termctl->c_cflag &= ~(HUPCL);
-    termctl->c_cflag |= CREAD;
-    termctl->c_cflag &= ~(CRTSCTS);
+    termctl->c_cflag &= ~(CSTOPB|CSIZE|PARENB|CLOCAL|HUPCL|CRTSCTS);
+    termctl->c_cflag |= CS8|CREAD;
     termctl->c_iflag &= ~(IXON | IXOFF | IXANY);
     termctl->c_iflag |= IGNBRK;
     scfg->termctl = termctl;
@@ -199,11 +163,6 @@ serial_create(char const *devname, unsigned long baudrate, size_t bufsize) {
     serial->open = serial_open;
     serial->close = serial_close;
     serial->configure = serial_configure;
-    serial->read_handler = serial_read_handler;
-    serial->write_handler = serial_write_handler;
-    serial->except_handler = serial_except_handler;
-    serial->read = serial_read;
-    serial->write = serial_write;
 
     return serial;
 }

@@ -16,7 +16,9 @@ struct tcp_cfg_s {
 };
 
 extern tcp_cfg_t *tcp_getcfg(iodev_t *sdev);
-extern iodev_t *tcp_create_listen(struct sockaddr *local);
-extern iodev_t *tcp_create_connect(struct sockaddr *remote, size_t bufsize);
+
+extern iodev_t *tcp_create_listen(iodev_t *dev, struct sockaddr *local, unsigned bufsize);
+extern iodev_t *tcp_create_accepted(iodev_t *dev, int fd, size_t bufsize);
+extern iodev_t *tcp_create_connect(iodev_t *dev, struct sockaddr *remote, size_t bufsize);
 
 #endif //GENERIC_NETTCP_H

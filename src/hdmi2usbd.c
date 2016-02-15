@@ -2,140 +2,199 @@
 // Created by David Nugent on 31/01/2016.
 //
 
+#ifdef __APPLE__
+// borrowed from http://www.opensource.apple.com/source/mDNSResponder/mDNSResponder-258.18/mDNSPosix/PosixDaemon.c
+// In Mac OS X 10.5 and later trying to use the daemon function gives a “‘daemon’ is deprecated”
+// error, which prevents compilation because we build with "-Werror".
+// Since this is supposed to be portable cross-platform code, we don't care that daemon is
+// deprecated on Mac OS X 10.5, so we use this preprocessor trick to eliminate the error message.
+#define daemon yes_we_know_that_daemon_is_deprecated_in_os_x_10_5_thankyou
+#endif
 
 #include <stddef.h>
 #include <string.h>
-#include <wordexp.h>
 #include <stdlib.h>
-#include <unistd.h>
+#include <stdio.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/errno.h>
+
+#ifdef __APPLE__
+#undef daemon
+extern int daemon(int, int);
+#endif
+
 
 #include "hdmi2usbd.h"
-#include "array.h"
-#include "iodev.h"
 #include "logging.h"
+#include "device.h"
+#include "netutils.h"
 
 
-// device list support
-
-static char const *auto_devices = "/dev/ttyVIZ*|/dev/ttyACM*";
-
-static struct ctrldev *
-new_odev(char const *devicename) {
-    struct ctrldev *curr_dev = NULL;
-    // requires a real, existing and accessible file
-    if (access(devicename, R_OK|W_OK) != -1) {
-        curr_dev = malloc(sizeof(struct ctrldev));
-        if (curr_dev != NULL) {
-            curr_dev->devname = strdup(devicename);
-            curr_dev->next = NULL;
-        }
-    }
-    return curr_dev;
-}
-
-void
-ctrldev_free(struct ctrldev *first_dev) {
-    if (first_dev) {
-        for (struct ctrldev *next = first_dev; next != NULL; ) {
-            free(next->devname);
-            struct ctrldev *fnext = next;
-            next = next->next;
-            free(fnext);
-        }
-    }
-}
-
-// This should theoretically test to see if it is an hdmi2usb
-// probably by figuring out which driver is handling it,
-// however we bypass this and always ok the first one...
-static int
-test_ctrldev(const struct ctrldev *_odev) {
-    return 1;
-}
-
-char *
-find_serial(const struct hdmi2usb_opts *opts) {
-    struct ctrldev *first_dev = find_serial_all(opts);
-    char *result = NULL;
-    for (struct ctrldev *next = first_dev; result == NULL && next != NULL; next = next->next) {
-        if (test_ctrldev(next)) {
-            result = next->devname;
-            next->devname = NULL;
-        }
-    }
-    ctrldev_free(first_dev);
-    return result;
-}
-
-
-// Attempt to locate
-
-struct ctrldev *
-find_serial_all(const struct hdmi2usb_opts *opts) {
-    static struct ctrldev *first_dev = NULL;
-
-    char const *devices = opts->port;
-    if (strcmp(devices, "auto") == 0)
-        devices = auto_devices;
-    size_t len = 0;
-    struct ctrldev **next_dev = &first_dev;
-    for (const char *p = devices; p != NULL && *p != '\0'; p += len) {
-        const char *sep = strchr(p, '|');
-        int skip = sep == NULL ? sep = p + strlen(p), 0 : 1;
-        len = sep - p;
-        if (len < 1)
-            break;
-        int xtra = *p == '/' || *p == '~' ? 0 : 5;   // need to add device prefix?
-        char device[len + xtra + 1];
-        if (xtra)
-            strcpy(device, "/dev/");
-        strncpy(device + xtra, p, len);
-        device[len + xtra] = '\0';
-        // Check for a glob pattern
-        if (strcspn(device, "*?!$[]") != strlen(device) || *device == '~') {
-            wordexp_t exprc;
-            switch (wordexp(device, &exprc, 0)) {
-                case 0:
-                    for (size_t i =0; i < exprc.we_wordc; i++) {
-                        if ((*next_dev = new_odev(exprc.we_wordv[i])) != NULL)
-                            next_dev = &(*next_dev)->next;
-                    }
-                case WRDE_NOSPACE:
-                    wordfree(&exprc);
-                default:
-                    break;
-            }
-        } else {
-            if ((*next_dev = new_odev(device)) != NULL)
-                next_dev = &(*next_dev)->next;
-        }
-        len += skip;
-    }
-    return first_dev;
-}
-
-int hdmi2usb_error(char const *fmt, va_list arg) { return log_log(V_ERROR, fmt, arg); }
-int hdmi2usb_notify(char const *fmt, va_list arg) { return log_log(V_INFO, fmt, arg); }
-
-
-static int
-hdmi2usb_init(struct hdmi2usb *app) {
-    int rc = 0;
-    // Redirect module error & notification messages to the logger
-    iodev_seterrfunc(hdmi2usb_error);
-    iodev_setnotify(hdmi2usb_notify);
-    array_seterrfunc(hdmi2usb_error);
-
-    return rc;
-}
+//// Logging interface ////
 
 
 int
-hdmi2usb_main(struct hdmi2usb *app) {
-    int rc = hdmi2usb_init(app);
-    while (rc == 0) {
-        // Main loop
+hdmi2usb_error(char const *fmt, va_list arg) {
+    return log_log(V_ERROR, fmt, arg);
+}
 
+int
+hdmi2usb_notify(char const *fmt, va_list arg) {
+    return log_log(V_INFO, fmt, arg);
+}
+
+
+//// signal handling ////
+
+static volatile unsigned short signal_received = 0;
+
+static void
+break_handler(int sig) {
+    // try graceful exit first, but quit immediately for double ctrl-c
+    if (sig == SIGINT && signal_received == SIGINT) {
+        fputs("Keyboard Quit\n", stderr);
+        exit(31);
+    }
+    signal_received = (unsigned short)(sig & 0xffffffff);
+}
+
+static int sigvec_index = 0;
+
+#define MAX_SIGVEC  7
+static struct {
+    int sig;
+    void (*handler)(int);
+} sigstack[MAX_SIGVEC];
+
+static int
+push_sighandler(int sig, void (*new_handler)(int)) {
+    sigstack[sigvec_index].sig = sig;
+    sigstack[sigvec_index].handler = signal(sig, new_handler);
+    return sigvec_index < MAX_SIGVEC ? ++sigvec_index : sigvec_index;
+}
+
+static int
+pop_sighandler() {
+    if (sigvec_index) {
+        --sigvec_index;
+        signal(sigstack[sigvec_index].sig, sigstack[sigvec_index].handler);
+    }
+    return sigvec_index;
+}
+
+static int nochdir = 1;
+static int noclose = 1;
+
+//// init and close functions ////
+
+static int
+hdmi2usb_init(struct hdmi2usb *app, int rc) {
+    // Redirect generic module error & notification messages to the logger
+    iodev_seterrfunc(hdmi2usb_error);
+    iodev_setnotify(hdmi2usb_notify);
+    netutils_seterrfunc(hdmi2usb_error);
+// array_seterrfunc(hdmi2usb_error); // autoset by netutils (which uses array)
+    // signal handlers
+    push_sighandler(SIGHUP, break_handler);
+    push_sighandler(SIGINT, break_handler);
+    // initialise selector, set up serial device and network listeners
+    selector_init(&app->selector);
+    // first, the serial device. We need to exit if we can't open this one
+    char *port = find_serial(app->opts.port);
+    if (port == NULL) {
+        log_critical("No available serial device matching '%s'", app->opts.port);
+        rc = 2;
+    } else {
+        log_debug("Selected serial port %s baud %lu bufsize %u", port, app->opts.baudrate, app->opts.iobufsize);
+        selector_new_device_serial(&app->selector, port, app->opts.baudrate, app->opts.iobufsize);
+        // Set up our listen port(s)
+        // Also need to exit with error message if it fails
+        unsigned listen_ports = 0;
+        char buf[64];
+        snprintf(buf, sizeof(buf) - 1, "%u", app->opts.listen_port);
+        ipaddrs_t *addrs = ipaddrs_resolve_stream(app->opts.listen_addr, buf, app->opts.listen_flags);
+        for (ipaddriter_t iter = ipaddriter_create(addrs); ipaddriter_hasnext(&iter); ) {
+            struct sockaddr *addr = ipaddriter_next(&iter);
+            switch (addr->sa_family) {
+                case AF_INET: {
+                    struct sockaddr_in *s4 = (struct sockaddr_in *) addr;
+                    if (s4->sin_addr.s_addr == INADDR_ANY) {
+                        listen_ports |= 4;
+                    } else if ((listen_ports & 1) == 0) {  // create ipv4 listen socket
+                        inet_ntop(addr->sa_family, sockaddr_addr(addr), buf, sizeof(buf) - 1);
+                        log_debug("Listening on IPv4 address %s", buf);
+                        app->listen[0] = selector_new_device_listen(&app->selector, addr, app->opts.iobufsize);
+                        listen_ports |= 1;
+                    }
+                    break;
+                }
+                case AF_INET6: {
+                    struct sockaddr_in6 *s6 = (struct sockaddr_in6 *) addr;
+                    struct in6_addr in6addr = IN6ADDR_ANY_INIT;
+                    if (IN6_ARE_ADDR_EQUAL(&s6->sin6_addr, &in6addr)) {
+                        listen_ports |= 4;
+                    } else if ((listen_ports & 2) == 0) {   // create ipv6 listen socket
+                        inet_ntop(addr->sa_family, sockaddr_addr(addr), buf, sizeof(buf) - 1);
+                        log_debug("Listening on IPv6 address %s", buf);
+                        app->listen[1] = selector_new_device_listen(&app->selector, addr, app->opts.iobufsize);
+                        listen_ports |= 2;
+                    }
+                    break;
+                }
+                default:
+                    continue;
+            }
+            if (listen_ports & 4) {
+                log_debug("Listening on ALL interfaces port %u", sockaddr_port(addr));
+                app->listen[0] = selector_new_device_listen(&app->selector, addr, app->opts.iobufsize);
+                break;
+            } else if (listen_ports == 3)
+                break;
+        }
+        ipaddrs_free(addrs);
+
+        if (rc == 0 && app->opts.daemonize) {
+            if (daemon(nochdir, noclose) == -1)
+                log_warning("daemon() failed(%d): %s", errno, strerror(errno));
+            app->opts.daemonize = 0;    // only do this once
+        }
     }
     return rc;
 }
+
+
+static int
+hdmi2usb_close(struct hdmi2usb *app, int rc) {
+    while (pop_sighandler())
+        ;
+    return rc;
+}
+
+
+//// main outide loop ////
+
+int
+hdmi2usb_main(struct hdmi2usb *app) {
+    int rc = hdmi2usb_init(app, 0);
+    while (rc == 0) {
+        rc = selector_loop(&app->selector, app->opts.loop_time);
+        // Main loop
+        switch (signal_received) {
+            case SIGHUP:
+                log_critical("Reloading on SIGHUP");
+                rc = hdmi2usb_init(app, hdmi2usb_close(app, 0));
+                break;
+            case SIGINT:
+                log_critical("Keyboard Quit");
+                rc = 3;
+                break;
+            default:
+
+                break;
+        }
+    }
+    return hdmi2usb_close(app, rc);
+}
+

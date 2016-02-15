@@ -2,11 +2,11 @@
 // Created by David Nugent on 2/02/2016.
 //
 
+#include "gtest/gtest.h"
 
 extern "C" {
 #include "logging.h"
 }
-#include "gtest/gtest.h"
 
 namespace {
 
@@ -34,7 +34,7 @@ namespace {
     };
 
     TEST(LoggingFunctions, loggingLevels) {
-        log_init(LOG_ECHO|LOG_STDERR, V_TRACE, "logfile-%Y%m%d_%H%M%S.log");
+        log_init(LOG_ECHO|LOG_STDERR|LOG_SYNC, V_TRACE, "logfile-%Y%m%d_%H%M%S.log");
         const char *levelnames[] = { "none", "fatal", "critical", "error", "warn", "info", "debug", "trace" };
         for (int v = V_NONE; v++ < V_MAX; ) {
             log_message((enum Verbosity)v, "This is a log message at %s level", levelnames[v]);

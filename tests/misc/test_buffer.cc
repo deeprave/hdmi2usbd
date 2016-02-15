@@ -2,13 +2,13 @@
 // Created by David Nugent on 4/02/2016.
 //
 
+#include <iostream>
+#include "gtest/gtest.h"
+
 extern "C" {
 #include "buffer.h"
 #include "logging.h"
 }
-
-#include <iostream>
-#include "gtest/gtest.h"
 
 namespace {
 
@@ -42,11 +42,11 @@ namespace {
     }
 
     TEST(BufferFunctions, testBufferPutGetAndAvailable) {
-        std::cout << std::endl << "testBufferPutGetAvail: buffsize ";
+        log_info("testBufferPutGetAvail: buffsize tests");
         for (int i =0; i < sizes; i++) {
             size_t size = buffer_sizes[i];
             buffer_t *buffer = buffer_init(NULL, size);
-            std::cout << size << " ";
+            log_info("%lu", size);
             if (size == BUFSIZE_NONE) {
                 unsigned char value = '!';
                 // Unbuffered needs to always fail put here
@@ -90,7 +90,7 @@ namespace {
             }
             buffer_free(buffer);
         }
-        std::cout << "done." << std::endl;
+        log_info("done.");
     }
 
 #define STRINGLENGTH 17
@@ -101,11 +101,11 @@ namespace {
         for (int i =0; i < STRINGLENGTH; i++)
             buf[i] = (unsigned char)('0' + i);
         buf[STRINGLENGTH] = '\0';
-        std::cout << std::endl << "testBufferPutGetUsed: buffsize ";
+        log_info("testBufferPutGetUsed: bufsize tests");
         for (int i =0; i < sizes; i++) {
             size_t size = buffer_sizes[i];
             buffer_t *b = buffer_init(NULL, size);
-            std::cout << size << " ";
+            log_info("%lu", size);
             if (size == BUFSIZE_NONE) {
                 ASSERT_EQ(0, buffer_put(b, &buf, STRINGLENGTH));
             } else {
@@ -126,11 +126,11 @@ namespace {
             }
             buffer_free(b);
         }
-        std::cout << "done." << std::endl << "testBufferPutGetMulti: buffsize ";
+        log_info("testBufferPutGetMulti: buffsize tests");
         for (int i =0; i < sizes; i++) {
             size_t size = buffer_sizes[i];
             buffer_t *b = buffer_init(NULL, size);
-            std::cout << size << " ";
+            log_info("%lu", size);
             if (size == BUFSIZE_NONE) {
                 ASSERT_EQ(0, buffer_put(b, &buf, STRINGLENGTH));
             } else {
@@ -160,7 +160,7 @@ namespace {
             }
             buffer_free(b);
         }
-        std::cout << "done." << std::endl;
+        log_info("done.");
     }
 
     TEST(BufferFunctions, testBufferWithIO) {

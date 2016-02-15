@@ -3,19 +3,26 @@
 //
 
 #include <stdlib.h>
+
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/errno.h>
 
 #include "iodev.h"
 
+#define IODEV_ALLOC 0x25a1da5
+
 
 iodev_cfg_t *iodev_getcfg(iodev_t *iodev) { return iodev->cfg; }
-const char *iodev_name(iodev_t *iodev) { return iodev->cfg->name; }
+const char *iodev_driver(iodev_t *iodev) { return iodev->cfg->name; }
 int iodev_getstate(iodev_t *dev) { return dev->state; }
 int iodev_setstate(iodev_t *dev, int state) { return dev->state = state; }
 int iodev_getfd(iodev_t *dev) { return dev->fd; }
 buffer_t *iodev_tbuf(iodev_t *dev) { return &dev->tbuf; }
 buffer_t *iodev_rbuf(iodev_t *dev) { return &dev->rbuf; }
+selector_t *getselector(iodev_t *dev) { return dev->selector; }
+void setselector(iodev_t *dev, selector_t *selector) { dev->selector = selector; }
 
 
 // Error message handling
@@ -40,12 +47,12 @@ static int (*iodev_errfunc)(char const *fmt, va_list args) = iodev_error_default
 static int (*iodev_notifyfunc)(char const *fmt, va_list args) = iodev_notify_default;
 
 void
-iodev_seterrfunc(int (*func)(char const *fmt, va_list args)) {
+iodev_seterrfunc(int (*func)(char const *, va_list)) {
     iodev_errfunc = func;
 }
 
 void
-iodev_setnotify(int (*func)(char const *fmt, va_list args)) {
+iodev_setnotify(int (*func)(char const *, va_list)) {
     iodev_notifyfunc = func;
 }
 
@@ -69,31 +76,147 @@ iodev_notify(char const *fmt, ...) {
 
 static int
 not_implemented(iodev_t *dev, char const *name) {
-    return iodev_error("unimplemented function '%s' called, device = %s", name, iodev_name(dev));
+    return iodev_error("unimplemented function '%s' called, device = %s", name, iodev_driver(dev));
 }
 
 
+static void free_cfg_default(iodev_cfg_t *dev) { if (dev == NULL); }
 
 iodev_cfg_t *
-alloc_cfg(size_t size, const char *name, int listener) {
+iodev_alloc_cfg(size_t size, const char *name, void (*free_cfg)(iodev_cfg_t *)) {
     iodev_cfg_t *cfg = calloc(1, size);
     cfg->name = name;
-    cfg->fd = -1;
-    cfg->listener = listener;
+    cfg->free_cfg = free_cfg ? free_cfg : free_cfg_default;
     return cfg;
 }
 
 
+void
+iodev_free_cfg(iodev_cfg_t *cfg) {
+    cfg->free_cfg(cfg);
+    free(cfg);
+}
+
+
+// redirect to device-specific routines
+
+static int
+iodev_open(iodev_t *dev) {
+    return not_implemented(dev, "open");
+}
+
+
+static void
+iodev_close(iodev_t *dev, int flags) {
+    if (flags);
+    not_implemented(dev, "close");
+}
+
+
+static int
+iodev_configure(iodev_t *dev, void *data) {
+    if (data);
+    return not_implemented(dev, "configure");
+}
+
+
+static ssize_t
+iodev_read_handler(iodev_t *dev) {
+    ssize_t rc = -1;
+    iodev_cfg_t *cfg = iodev_getcfg(dev);
+
+    if (dev->fd == -1)
+        iodev_error("iodev %s read error: device is closed", cfg->name);
+    else {
+        size_t available = buffer_available(&dev->rbuf);
+        void *tmp = alloca(available);
+        rc = read(dev->fd, tmp, available);
+        if (rc > 0)
+            buffer_put(&dev->rbuf, tmp, (size_t)rc);
+        else {
+            if (rc < 0)
+                iodev_error("iodev %s read error(%d): %s, closing", cfg->name, errno, strerror(errno));
+            else // (rc == 0) // eof
+                iodev_notify("iodev %s EOF from fd %d, closing", cfg->name, dev->fd);
+            buffer_flush(&dev->rbuf);
+            buffer_flush(&dev->tbuf);
+            iodev_setstate(dev, IODEV_CLOSING);
+        }
+    }
+    return rc;
+}
+
+
+static ssize_t
+iodev_write_handler(iodev_t *dev) {
+    ssize_t rc = -1;
+    iodev_cfg_t *cfg = iodev_getcfg(dev);
+
+    if (dev->fd == -1)
+        iodev_error("iodev %s write error: device is closed", cfg->name);
+    else {
+        size_t available = buffer_used(&dev->tbuf);
+        if (!available)
+            rc = available;
+        else {
+            void *tmp = alloca(available);
+            buffer_peek(&dev->tbuf, tmp, available);
+            rc = write(dev->fd, tmp, available);
+            if (rc < 0) {
+                iodev_error("iodev %s write error(%d): %s", cfg->name, errno, strerror(errno));
+                buffer_flush(&dev->rbuf);
+                buffer_flush(&dev->tbuf);
+                iodev_setstate(dev, IODEV_CLOSING);
+            } else { // advance the counter by amount written
+                buffer_get(&dev->rbuf, NULL, (size_t)rc);
+            }
+        }
+    }
+    return rc;
+}
+
+
+static ssize_t
+iodev_except_handler(iodev_t *dev) {
+    return not_implemented(dev, "except_handler");
+}
+
+
+static ssize_t
+iodev_read(iodev_t *dev, void *buf, size_t len) {
+    return not_implemented(dev, "read");
+}
+
+static ssize_t
+iodev_write(iodev_t *dev, void const *buf, size_t len) {
+    return not_implemented(dev, "write");
+}
+
+
 iodev_t *
-iodev_create(iodev_cfg_t *cfg, size_t bufsize) {
-    iodev_t *dev = malloc(sizeof(iodev_t));
-    memset(dev, '\0', sizeof(iodev_t));
+iodev_init(iodev_t *dev, iodev_cfg_t *cfg, size_t bufsize) {
+    if (dev == NULL) {
+        dev = calloc(1, sizeof(iodev_t));
+        dev->alloc = IODEV_ALLOC;
+    } else
+        memset(dev, '\0', sizeof(iodev_t));
     dev->cfg = cfg;
     dev->fd = -1;
+    dev->listener = bufsize == 0;
     dev->selector = NULL;
     dev->state = IODEV_NONE;
+    dev->bufsize = bufsize;
     buffer_init(&dev->rbuf, bufsize);
     buffer_init(&dev->rbuf, bufsize);
+    // default i/o functions
+    dev->open = iodev_open;
+    dev->close = iodev_close;
+    dev->configure = iodev_configure;
+    dev->read_handler = iodev_read_handler;
+    dev->write_handler = iodev_write_handler;
+    dev->except_handler = iodev_except_handler;
+    dev->read = iodev_read;
+    dev->write = iodev_write;
     return dev;
 }
 
@@ -102,46 +225,10 @@ void
 iodev_free(iodev_t *dev) {
     buffer_free(&dev->rbuf);
     buffer_free(&dev->tbuf);
-    free(dev);
+    iodev_free_cfg(dev->cfg);
+    if (dev->alloc == IODEV_ALLOC) {
+        dev->alloc = 0;
+        free(dev);
+    }
 }
 
-
-// redirect to device-specific routines
-
-int
-iodev_open(iodev_t *dev) {
-    return dev->open ? dev->open(dev) : not_implemented(dev, "open");
-}
-
-void
-iodev_close(iodev_t *dev, int flags) {
-    dev->close ? dev->close(dev, flags) : not_implemented(dev, "close");
-}
-
-int
-iodev_configure(iodev_t *dev, void *data) {
-    return dev->configure ? dev->configure(dev, data) : not_implemented(dev, "configure");
-}
-
-int
-iodev_read_handler(iodev_t *dev) {
-    return dev->read_handler ? dev->read_handler(dev) : not_implemented(dev, "read_handler");
-}
-
-int iodev_write_handler(iodev_t *dev) {
-    return dev->write_handler ? dev->write_handler(dev) : not_implemented(dev, "write_handler");
-}
-
-int iodev_except_handler(iodev_t *dev) {
-    return dev->except_handler ? dev->except_handler(dev) : not_implemented(dev, "except_handler");
-}
-
-int
-iodev_read(iodev_t *dev, void *buf, size_t len) {
-    return dev->read ? dev->read(dev, buf, len) : not_implemented(dev, "read");
-}
-
-int
-iodev_write(iodev_t *dev, void const *buf, size_t len) {
-    return dev->write ? dev->write(dev, buf, len) : not_implemented(dev, "write");
-}

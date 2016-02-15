@@ -5,7 +5,7 @@ option(tests "Build all tests." OFF)         # cmake -Dtest=ON
 set(PROJECT_NAME hdmi2usbd)
 project(${PROJECT_NAME})
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-function")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 
 if (APPLE)
@@ -19,16 +19,19 @@ set(SUPPORT_SOURCE_FILES
         src/array.c include/array.h
         src/buffer.c include/buffer.h
         src/logging.c include/logging.h
+        src/netutils.c include/netutils.h
         src/iodev.c include/iodev.h
         src/selector.c include/selector.h
         src/serial.c include/serial.h
-        src/nettcp.c include/nettcp.h)
+        src/nettcp.c include/nettcp.h
+        src/device.c include/device.h)
 
 set(HDMI2USBD_SOURCE_FILES
         src/hdmi2usbd.c include/hdmi2usbd.h)
 
 add_executable(hdmi2usbd
         src/main.c
+        src/sockets.c
         ${HDMI2USBD_SOURCE_FILES}
         ${SUPPORT_SOURCE_FILES})
 
@@ -54,7 +57,8 @@ if (tests)
             ${SUPPORT_SOURCE_FILES}
             tests/misc/test_logging.cc
             tests/misc/test_array.cc
-            tests/misc/test_buffer.cc)
+            tests/misc/test_buffer.cc
+            tests/misc/test_ipaddrs.cc)
 
     target_link_libraries(runMiscUnitTests gtest gtest_main)
     add_test(misc_tests runMiscUnitTests)
