@@ -4,15 +4,17 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netdb.h>
-#include <unistd.h>
-#include <sys/errno.h>
-#include <string.h>
-#include <sys/fcntl.h>
 #include <stdlib.h>
+#include <string.h>
+#include <netdb.h>
+#include <sys/errno.h>
+#include <sys/fcntl.h>
+#include <unistd.h>
+#include <arpa/inet.h>
 
 #include "nettcp.h"
 #include "netutils.h"
+#include "selector.h"
 
 
 tcp_cfg_t *
@@ -42,17 +44,22 @@ tcp_open(iodev_t *dev) {
 
 
 static int
-tcp_accepted(iodev_t *dev, int fd) {
-//  tcp_cfg_t *cfg = tcp_getcfg(dev);
-
-    iodev_setstate(dev, IODEV_OPEN);
+tcp_accept(iodev_t *dev, int fd, struct sockaddr *addr) {
+    char paddr[64];
+    iodev_notify("accepted connection from %s on fd=%d",
+                 inet_ntop(addr->sa_family, sockaddr_addr(addr), paddr, sizeof(paddr)),
+                 fd);
+    iodev_setstate(dev, IODEV_CONNECTED);
     return dev->fd = fd;
 }
 
 
+//// listen socket support functions ////
+
+#define BACKLOG_SIZE 16
+
 static int
 tcp_open_listen(iodev_t *dev) {
-
     if (iodev_getstate(dev) >= IODEV_OPEN)
         dev->close(dev, IOFLAG_NONE);
 
@@ -78,15 +85,35 @@ tcp_open_listen(iodev_t *dev) {
         if (fcntl(dev->fd, F_SETFL, opts) < 0)
             iodev_error("fcntl(%d, F_SETFL) error(%d): %s", dev->fd, errno, strerror(errno));
 
-        // finally bind it
+        iodev_setstate(dev, IODEV_OPEN);
+        // finally bind it and listen
         if (bind(dev->fd, cfg->local, cfg->local->sa_len) == -1) {
             iodev_error("socket bind error(%d): %s", errno, strerror(errno));
-            dev->(dev, IOFLAG_INACTIVE);
-        } else
+            dev->close(dev, IOFLAG_INACTIVE);
+        } else if (listen(dev->fd, BACKLOG_SIZE) < 0) {
+            iodev_error("socket bind error(%d): %s", errno, strerror(errno));
+            dev->close(dev, IOFLAG_INACTIVE);
+        } else {
             iodev_setstate(dev, IODEV_CONNECTED);
+        }
     }
-
     return dev->fd;
+}
+
+
+static ssize_t
+tcp_accept_handler(iodev_t *dev) {
+    // we got here via read event from select on this socket
+    struct sockaddr_storage sock;
+    socklen_t socklen = sizeof(sock);
+
+    int fd = accept(dev->fd, (struct sockaddr *)&sock, &socklen);
+    if (fd < 0)
+        iodev_notify("accept failure(%d): %s", errno, strerror(errno));
+    else {
+        selector_new_device_accept(dev->selector, fd, (struct sockaddr *)&sock, dev->bufsize);
+    }
+    return fd;
 }
 
 
@@ -147,13 +174,14 @@ tcp_create(iodev_t *dev, struct sockaddr *local, struct sockaddr *remote, size_t
 
 
 iodev_t *
-tcp_create_listen(iodev_t *dev, struct sockaddr *local, unsigned bufsize) {
+tcp_create_listen(iodev_t *dev, struct sockaddr *local, size_t bufsize) {
     iodev_t *tcp = tcp_create(dev, local, NULL, 0);
     // we don't use bufsize for this socket since there is no IO
     // but use it for devices created via accept(), so record it here
     tcp->bufsize = bufsize;
     // special "open" for listener
     tcp->open = tcp_open_listen;
+    tcp->read_handler = tcp_accept_handler;
     return tcp;
 }
 
@@ -167,8 +195,8 @@ tcp_create_connect(iodev_t *dev, struct sockaddr *remote, size_t bufsize) {
 
 
 iodev_t *
-tcp_create_accepted(iodev_t *dev, int fd, size_t bufsize) {
-    iodev_t *net = tcp_create(dev, NULL, NULL, bufsize);
-    tcp_accepted(dev, fd);
+tcp_create_accepted(iodev_t *dev, int fd, struct sockaddr *remote, size_t bufsize) {
+    iodev_t *net = tcp_create(dev, NULL, remote, bufsize);
+    tcp_accept(dev, fd, remote);
     return net;
 }

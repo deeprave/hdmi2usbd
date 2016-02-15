@@ -80,7 +80,7 @@ not_implemented(iodev_t *dev, char const *name) {
 }
 
 
-static void free_cfg_default(iodev_cfg_t *dev) { if (dev == NULL); }
+static void free_cfg_default(iodev_cfg_t *dev) { }
 
 iodev_cfg_t *
 iodev_alloc_cfg(size_t size, const char *name, void (*free_cfg)(iodev_cfg_t *)) {
@@ -108,14 +108,12 @@ iodev_open(iodev_t *dev) {
 
 static void
 iodev_close(iodev_t *dev, int flags) {
-    if (flags);
     not_implemented(dev, "close");
 }
 
 
 static int
 iodev_configure(iodev_t *dev, void *data) {
-    if (data);
     return not_implemented(dev, "configure");
 }
 
@@ -182,12 +180,12 @@ iodev_except_handler(iodev_t *dev) {
 }
 
 
-static ssize_t
+ssize_t
 iodev_read(iodev_t *dev, void *buf, size_t len) {
     return not_implemented(dev, "read");
 }
 
-static ssize_t
+ssize_t
 iodev_write(iodev_t *dev, void const *buf, size_t len) {
     return not_implemented(dev, "write");
 }

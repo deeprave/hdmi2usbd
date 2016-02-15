@@ -76,26 +76,26 @@ selector_new_device(selector_t *selector) {
 
 // Allocate a serial iodev
 iodev_t *
-selector_new_device_serial(selector_t *selector, char const *devname, unsigned long baudrate, unsigned bufsize) {
+selector_new_device_serial(selector_t *selector, char const *devname, unsigned long baudrate, size_t bufsize) {
     return selector_set(selector, serial_create(selector_new_device(selector), devname, baudrate, bufsize));
 }
 
 // Allocate a listen socket iodev
 iodev_t *
-selector_new_device_listen(selector_t *selector, struct sockaddr *local, unsigned bufsize) {
+selector_new_device_listen(selector_t *selector, struct sockaddr *local, size_t bufsize) {
     return selector_set(selector, tcp_create_listen(selector_new_device(selector), local, bufsize));
 }
 
 // Allocate a socket connection iodev
 iodev_t *
-selector_new_device_connect(selector_t *selector, struct sockaddr *remote, unsigned bufsize) {
+selector_new_device_connect(selector_t *selector, struct sockaddr *remote, size_t bufsize) {
     return selector_set(selector, tcp_create_connect(selector_new_device(selector), remote, bufsize));
 }
 
 // Allocate an accepted socket connection iodev
 iodev_t *
-selector_new_device_accepted(selector_t *selector, int fd, unsigned bufsize) {
-    return selector_set(selector, tcp_create_accepted(selector_new_device(selector), fd, bufsize));
+selector_new_device_accept(selector_t *selector, int fd, struct sockaddr *remote, size_t bufsize) {
+    return selector_set(selector, tcp_create_accepted(selector_new_device(selector), fd, remote, bufsize));
 }
 
 

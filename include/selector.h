@@ -25,10 +25,10 @@ extern iodev_t *selector_get_device(selector_t *selector, size_t index);
 extern void selector_add_device(selector_t *selector, iodev_t *dev);
 extern iodev_t *selector_set(selector_t *selector, iodev_t *dev);
 
-extern iodev_t *selector_new_device_serial(selector_t *selector, char const *devname, unsigned long baudrate, unsigned bufsize);
-extern iodev_t *selector_new_device_listen(selector_t *selector, struct sockaddr *local, unsigned bufsize);
-extern iodev_t *selector_new_device_connect(selector_t *selector, struct sockaddr *remote, unsigned bufsize);
-extern iodev_t *selector_new_device_accepted(selector_t *selector, int fd, unsigned bufsize);
+extern iodev_t *selector_new_device_serial(selector_t *selector, char const *devname, unsigned long baudrate, size_t bufsize);
+extern iodev_t *selector_new_device_listen(selector_t *selector, struct sockaddr *local, size_t bufsize);
+extern iodev_t *selector_new_device_connect(selector_t *selector, struct sockaddr *remote, size_t bufsize);
+extern iodev_t *selector_new_device_accept(selector_t *selector, int fd, struct sockaddr *remote, size_t bufsize);
 
 extern int selector_loop(selector_t *selector, unsigned long timeout);
 
