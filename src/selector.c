@@ -112,53 +112,11 @@ selector_ioset(selector_t *selector, fd_set *r, fd_set *w, fd_set *x) {
     array_t *devs = &selector->devs;
     for (size_t index =0; index < array_count(devs); ++index) {
         iodev_t *dev = array_get(devs, index);
-        int is_active = 0;
-        switch (iodev_getstate(dev)) {
-            case IODEV_INACTIVE:    // device closed/dead
-            default:
-                break;
-            case IODEV_CLOSING:     // pre-close flushing
-                FD_CLR(dev->fd, r);
-                if (buffer_used(iodev_tbuf(dev)) > 0) {
-                    FD_SET(dev->fd, w);
-                    FD_CLR(dev->fd, x);
-                    is_active++;
-                } else {
-                    FD_CLR(dev->fd, w);
-                    FD_SET(dev->fd, x);
-                    dev->close(dev, IOFLAG_NONE);
-                }
-                break;
-            case IODEV_NONE:        // default (startup) state
-            case IODEV_CLOSED:      // currently closed, due for reopen
-                dev->open(dev);
-                break;
-            case IODEV_PENDING:     // waiting for open to complete
-                FD_SET(dev->fd, r);
-                FD_CLR(dev->fd, w);
-                FD_SET(dev->fd, x);
-                is_active++;
-                break;
-            case IODEV_OPEN:        // open/operating
-            case IODEV_CONNECTED:   // connected
-            case IODEV_ACTIVE:      // connected with I/O pending
-                if (buffer_available(iodev_rbuf(dev)) > 0)
-                    FD_SET(dev->fd, r);
-                else
-                    FD_CLR(dev->fd, r);
-                if (buffer_used(iodev_tbuf(dev)) > 0)
-                    FD_SET(dev->fd, w);
-                else
-                    FD_CLR(dev->fd, w);
-                FD_SET(dev->fd, x);
-                is_active++;
-                break;
-        }
-        if (is_active) {
+        if (dev->set_masks(dev, r, w, x)) {
             stat.active_count++;
             int fd = iodev_getfd(dev);
-            if (fd > stat.highest_fd)
-                stat.highest_fd = 0;
+            if (fd >= stat.highest_fd)
+                stat.highest_fd = fd + 1;
         }
     }
     return stat;
@@ -166,8 +124,29 @@ selector_ioset(selector_t *selector, fd_set *r, fd_set *w, fd_set *x) {
 
 
 static int
-selector_dispatch(selector_t *selector, int ready, fd_set *rd_set, fd_set *wr_set, fd_set *ex_set) {
+selector_dispatch(selector_t *selector, int ready, fd_set *r, fd_set *w, fd_set *x) {
     int rc = 0;
+    array_t *devs = &selector->devs;
+    for (size_t index =0; ready > 0 && index < array_count(devs); ++index) {
+        iodev_t *dev = array_get(devs, index);
+        int handled = 0;
+        if (dev->is_set(dev, r)) {
+            handled = 1;
+            if (dev->read_handler(dev) < 0)
+                continue;
+        }
+        if (dev->is_set(dev, w)) {
+            handled = 1;
+            if (dev->write_handler(dev) < 0)
+                continue;
+        }
+        if (dev->is_set(dev, x)) {
+            handled = 1;
+            if (dev->except_handler(dev) < 0)
+                continue;
+        }
+        ready -= handled;
+    }
     return rc;
 }
 
@@ -201,15 +180,16 @@ selector_loop(selector_t *selector, unsigned long timeout) {
             .tv_sec = timeout / 1000L,
             .tv_usec = (unsigned)((timeout % 1000) * 1000)
         };
-        int rdy = select(stat.highest_fd + 1, &rd_set, &wr_set, &ex_set, timeout == 0 ? NULL : &to);
-        if (rdy > 0) {
+        int rdy = select(stat.highest_fd, &rd_set, &wr_set, &ex_set, timeout == 0 ? NULL : &to);
+        if (rdy > 0)
             rc = selector_dispatch(selector, rdy, &rd_set, &wr_set, &ex_set);
-            continue;
-        } else if (rdy < 0) {
-            selector_debug(selector, rdy, errno, &rd_set, &wr_set, &ex_set);
-            log_warning("select error(%d): %s", errno, strerror(errno));
+        else {
+            if (rdy < 0) {
+                selector_debug(selector, rdy, errno, &rd_set, &wr_set, &ex_set);
+                log_warning("select error(%d): %s", errno, strerror(errno));
+            }
+            break;
         }
-        break;
     }
     return rc;
 }

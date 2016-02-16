@@ -2,8 +2,8 @@
 // Created by David Nugent on 3/02/2016.
 //
 
+#include <sys/types.h>
 #include <stdlib.h>
-
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -118,6 +118,59 @@ iodev_configure(iodev_t *dev, void *data) {
 }
 
 
+static int
+iodev_is_set(iodev_t *dev, fd_set *fds) {
+    return dev->fd == -1 ? 0 : FD_ISSET(dev->fd, fds);
+}
+
+
+static int
+iodev_set_masks(iodev_t *dev, fd_set *r, fd_set *w, fd_set *x) {
+    int is_active = 0;
+    if (dev->fd >= 0) {
+        // clear all by default
+        FD_CLR(dev->fd, r);
+        FD_CLR(dev->fd, w);
+        FD_CLR(dev->fd, x);
+    }
+    switch (iodev_getstate(dev)) {
+        case IODEV_INACTIVE:    // device closed/dead
+        default:
+            break;
+        case IODEV_CLOSING:     // pre-close flushing
+            if (buffer_used(iodev_tbuf(dev)) > 0) {
+                FD_SET(dev->fd, w);
+                FD_SET(dev->fd, x);
+                is_active++;
+            } else {
+                FD_SET(dev->fd, x);
+                dev->close(dev, IOFLAG_NONE);
+            }
+            break;
+        case IODEV_NONE:        // default (startup) state
+        case IODEV_CLOSED:      // currently closed, due for reopen
+            dev->open(dev);
+            break;
+        case IODEV_PENDING:     // waiting for open to complete
+            FD_SET(dev->fd, r);
+            FD_SET(dev->fd, x);
+            is_active++;
+            break;
+        case IODEV_OPEN:        // open/operating
+        case IODEV_CONNECTED:   // connected
+        case IODEV_ACTIVE:      // connected with I/O pending
+            if (buffer_available(iodev_rbuf(dev)) > 0)
+                FD_SET(dev->fd, r);
+            if (buffer_used(iodev_tbuf(dev)) > 0)
+                FD_SET(dev->fd, w);
+            FD_SET(dev->fd, x);
+            is_active++;
+            break;
+    }
+    return is_active;
+}
+
+
 static ssize_t
 iodev_read_handler(iodev_t *dev) {
     ssize_t rc = -1;
@@ -210,6 +263,8 @@ iodev_init(iodev_t *dev, iodev_cfg_t *cfg, size_t bufsize) {
     dev->open = iodev_open;
     dev->close = iodev_close;
     dev->configure = iodev_configure;
+    dev->set_masks = iodev_set_masks;
+    dev->is_set = iodev_is_set;
     dev->read_handler = iodev_read_handler;
     dev->write_handler = iodev_write_handler;
     dev->except_handler = iodev_except_handler;

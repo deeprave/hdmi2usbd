@@ -50,16 +50,19 @@ tcp_accept(iodev_t *dev, int fd, struct sockaddr *addr) {
                  inet_ntop(addr->sa_family, sockaddr_addr(addr), paddr, sizeof(paddr)),
                  fd);
     iodev_setstate(dev, IODEV_OPEN);
+    dev->fd = fd;
     // set non-blocking
     int opts = fcntl(dev->fd, F_GETFL);
     if (opts < 0)
         iodev_error("fcntl(%d, F_GETFL) error(%d): %s", dev->fd, errno, strerror(errno));
-    opts |= O_NONBLOCK;
-    if (fcntl(dev->fd, F_SETFL, opts) < 0)
-        iodev_error("fcntl(%d, F_SETFL) error(%d): %s", dev->fd, errno, strerror(errno));
+    else {
+        opts |= O_NONBLOCK;
+        if (fcntl(dev->fd, F_SETFL, opts) < 0)
+            iodev_error("fcntl(%d, F_SETFL) error(%d): %s", dev->fd, errno, strerror(errno));
+    }
 
     iodev_setstate(dev, IODEV_CONNECTED);
-    return dev->fd = fd;
+    return fd;
 }
 
 
@@ -91,9 +94,11 @@ tcp_open_listen(iodev_t *dev) {
         int opts = fcntl(dev->fd, F_GETFL);
         if (opts < 0)
             iodev_error("fcntl(%d, F_GETFL) error(%d): %s", dev->fd, errno, strerror(errno));
-        opts |= O_NONBLOCK;
-        if (fcntl(dev->fd, F_SETFL, opts) < 0)
-            iodev_error("fcntl(%d, F_SETFL) error(%d): %s", dev->fd, errno, strerror(errno));
+        else {
+            opts |= O_NONBLOCK;
+            if (fcntl(dev->fd, F_SETFL, opts) < 0)
+                iodev_error("fcntl(%d, F_SETFL) error(%d): %s", dev->fd, errno, strerror(errno));
+        }
 
         // finally bind it and listen
         if (bind(dev->fd, cfg->local, cfg->local->sa_len) == -1) {
@@ -108,6 +113,35 @@ tcp_open_listen(iodev_t *dev) {
     }
     return dev->fd;
 }
+
+
+static int
+tcp_set_masks_listen(iodev_t *dev, fd_set *r, fd_set *w, fd_set *x) {
+    int is_active = 0;
+    if (dev->fd >= 0) {
+        // clear all by default
+        FD_CLR(dev->fd, r);
+        FD_CLR(dev->fd, w);
+        FD_CLR(dev->fd, x);
+    }
+    switch (iodev_getstate(dev)) {
+        case IODEV_NONE:        // default (startup) state
+        case IODEV_CLOSED:      // currently closed, due for reopen
+            dev->open(dev);
+        default:
+            break;
+        case IODEV_PENDING:     // waiting for open to complete
+        case IODEV_OPEN:        // open/operating
+        case IODEV_CONNECTED:   // connected
+        case IODEV_ACTIVE:      // connected with I/O pending
+            FD_SET(dev->fd, r);
+            FD_SET(dev->fd, x);
+            is_active++;
+            break;
+    }
+    return is_active;
+}
+
 
 
 static ssize_t
@@ -191,6 +225,7 @@ tcp_create_listen(iodev_t *dev, struct sockaddr *local, size_t bufsize) {
     // special "open" for listener
     tcp->open = tcp_open_listen;
     tcp->read_handler = tcp_accept_handler;
+    tcp->set_masks = tcp_set_masks_listen;
     return tcp;
 }
 

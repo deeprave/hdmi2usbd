@@ -61,6 +61,8 @@ struct iodev_s {
     int (*configure)(iodev_t *dev, void *data);
 
     // raw I/O
+    int (*set_masks)(iodev_t *dev, fd_set *rs, fd_set *ws, fd_set *xs);
+    int (*is_set)(iodev_t *dev, fd_set *fds);
     ssize_t (*read_handler)(iodev_t *dev);
     ssize_t (*write_handler)(iodev_t *dev);
     ssize_t (*except_handler)(iodev_t *dev);
