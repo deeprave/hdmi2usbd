@@ -103,7 +103,7 @@ parse_port(char *at, int *rc) {
 
 int
 parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
-    int rc =0, r =0;
+    int rc =EX_SUCCESS, r =0;
     int longindex = 0;
 
     while (rc == 0 && (r = getopt_long(argc, argv, shortopts, longopts, &longindex)) != EOF) {
@@ -113,7 +113,7 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                 // notreached
             case 'v':
                 printf("%s version %s\n", HDMI2USBD_NAME, HDMI2USBD_VERSION);
-                exit(0);
+                exit(EX_SUCCESS);
                 // notreached
             case 'V':
             case 'd':
@@ -146,7 +146,7 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                         break;
                 }
                 fprintf(stderr, "invalid speed '%s'\n", optarg);
-                rc = usage(stderr, 2);
+                rc = usage(stderr, EX_STARTUP);
                 break;
             }
             case 'b': {
@@ -157,7 +157,7 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                     break;
                 }
                 fprintf(stderr, "invalid buffsize '%s'\n", optarg);
-                rc = usage(stderr, 2);
+                rc = usage(stderr, EX_STARTUP);
                 break;
             }
             case 'l': {
@@ -195,7 +195,7 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                     if (!rc)
                         break;
                 }
-                rc = usage(stderr, 2);
+                rc = usage(stderr, EX_STARTUP);
                 break;
             }
             case 'p': {
@@ -253,7 +253,7 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                 fprintf(stderr, "parameter -%c is not being handled", r);
             case ':':
             case '?':
-                rc = usage(stderr, 1);
+                rc = usage(stderr, EX_STARTUP);
                 break;
         }
     }
@@ -283,6 +283,8 @@ main(int argc, char * const *argv) {
 
     int rc = parse_args(argc, argv, &app.opts);
     if (rc == 0) {
+        buffer_init(&app.proc, app.opts.iobufsize * 2);
+        buffer_init(&app.copy, app.opts.iobufsize * 2);
         log_init(app.opts.logflags,
                  (enum Verbosity)app.opts.verbose,
                  app.opts.logfile);
@@ -300,5 +302,5 @@ main(int argc, char * const *argv) {
         rc = hdmi2usb_main(&app);
         log_critical("%s ended (exitcode=%d)", HDMI2USBD_NAME, rc);
     }
-    return rc;
+    return rc < EX_STARTUP ? 0 : rc;
 }

@@ -12,6 +12,16 @@
 
 #define MAX_SERIAL_SPECS 31
 
+enum {
+    EX_SUCCESS,
+    EX_NORMAL,
+    EX_REQUEST,
+    EX_STARTUP,
+    EX_FAILURE,
+    EX_CRITICAL,
+    EX_FATAL,
+};
+
 
 // configuration data
 struct hdmi2usb_opts {
@@ -32,8 +42,8 @@ struct hdmi2usb_opts {
 struct hdmi2usb {
     struct hdmi2usb_opts opts;
     selector_t selector;
-    iodev_t *serial;
-    iodev_t *listen[2];
+    buffer_t proc;          // for processing serial input
+    buffer_t copy;          // output to network connections
 };
 
 

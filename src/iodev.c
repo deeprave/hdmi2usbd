@@ -19,8 +19,11 @@ const char *iodev_driver(iodev_t *iodev) { return iodev->cfg->name; }
 int iodev_getstate(iodev_t *dev) { return dev->state; }
 int iodev_setstate(iodev_t *dev, int state) { return dev->state = state; }
 int iodev_getfd(iodev_t *dev) { return dev->fd; }
+int iodev_is_listener(iodev_t *dev) { return dev->listener; }
+int iodev_is_open(iodev_t *dev) { return iodev_getstate(dev) >= IODEV_OPEN; }
 buffer_t *iodev_tbuf(iodev_t *dev) { return &dev->tbuf; }
 buffer_t *iodev_rbuf(iodev_t *dev) { return &dev->rbuf; }
+
 selector_t *getselector(iodev_t *dev) { return dev->selector; }
 void setselector(iodev_t *dev, selector_t *selector) { dev->selector = selector; }
 

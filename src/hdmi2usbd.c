@@ -105,7 +105,7 @@ hdmi2usb_init(struct hdmi2usb *app, int rc) {
     char *port = find_serial(app->opts.port);
     if (port == NULL) {
         log_critical("No available serial device matching '%s'", app->opts.port);
-        rc = 2;
+        rc = EX_STARTUP;
     } else {
         log_debug("Selected serial port %s baud %lu bufsize %u", port, app->opts.baudrate, app->opts.iobufsize);
         selector_new_device_serial(&app->selector, port, app->opts.baudrate, app->opts.iobufsize);
@@ -125,7 +125,7 @@ hdmi2usb_init(struct hdmi2usb *app, int rc) {
                     } else if ((listen_ports & 1) == 0) {  // create ipv4 listen socket
                         inet_ntop(addr->sa_family, sockaddr_addr(addr), buf, sizeof(buf) - 1);
                         log_debug("Listening on IPv4 address %s", buf);
-                        app->listen[0] = selector_new_device_listen(&app->selector, addr, app->opts.iobufsize);
+                        selector_new_device_listen(&app->selector, addr, app->opts.iobufsize);
                         listen_ports |= 1;
                     }
                     break;
@@ -138,7 +138,7 @@ hdmi2usb_init(struct hdmi2usb *app, int rc) {
                     } else if ((listen_ports & 2) == 0) {   // create ipv6 listen socket
                         inet_ntop(addr->sa_family, sockaddr_addr(addr), buf, sizeof(buf) - 1);
                         log_debug("Listening on IPv6 address %s", buf);
-                        app->listen[1] = selector_new_device_listen(&app->selector, addr, app->opts.iobufsize);
+                        selector_new_device_listen(&app->selector, addr, app->opts.iobufsize);
                         listen_ports |= 2;
                     }
                     break;
@@ -148,14 +148,14 @@ hdmi2usb_init(struct hdmi2usb *app, int rc) {
             }
             if (listen_ports & 4) {
                 log_debug("Listening on ALL interfaces port %u", sockaddr_port(addr));
-                app->listen[0] = selector_new_device_listen(&app->selector, addr, app->opts.iobufsize);
+                selector_new_device_listen(&app->selector, addr, app->opts.iobufsize);
                 break;
             } else if (listen_ports == 3)
                 break;
         }
         ipaddrs_free(addrs);
 
-        if (rc == 0 && app->opts.daemonize) {
+        if (rc == EX_SUCCESS && app->opts.daemonize) {
             if (daemon(nochdir, noclose) == -1)
                 log_warning("daemon() failed(%d): %s", errno, strerror(errno));
             app->opts.daemonize = 0;    // only do this once
@@ -173,7 +173,55 @@ hdmi2usb_close(struct hdmi2usb *app, int rc) {
 }
 
 
-//// main outide loop ////
+static size_t
+hdmi2usb_process_serial_data(struct hdmi2usb *app, iodev_t *serial) {
+    size_t s_bytes = iodev_is_open(serial) ? buffer_used(iodev_rbuf(serial)) : 0;
+    if (s_bytes) {
+        // process the datas here
+        //... TODO
+        // pick up anything left over and copy to network connections (if any)
+        s_bytes = buffer_move(&app->copy, iodev_rbuf(serial), s_bytes);
+    }
+    return s_bytes;
+}
+
+
+// Process cycle for the application
+
+static int
+hdmi2usb_process(struct hdmi2usb *app, int rc) {
+    // basic stuff
+    // The serial device is alaways at index 0 in the managed devices array.
+    // It must be open and active, else everything else is pointless
+    iodev_t *serial = selector_get_device(&app->selector, 0);
+    if (serial == NULL || iodev_getstate(serial) == IODEV_INACTIVE)
+        return EX_NORMAL;
+    // At least one listen port must also be open, check for this
+    // when we scan ports for application I/O
+    size_t s_bytes = hdmi2usb_process_serial_data(app, serial);
+    int listener_count = 0;
+    int connect_count = 0;
+    for (size_t index = 1; index < selector_device_count(&app->selector); index++) {
+        iodev_t *dev = selector_get_device(&app->selector, index);
+        if (iodev_is_listener(dev))
+            ++listener_count;
+        else {
+            ++connect_count;
+            // copy processed serial data to non-listener network sockets
+            if (s_bytes)
+                buffer_copy(iodev_tbuf(dev), &app->copy, s_bytes);
+            // process input from network connection
+            //... TODO
+        }
+    }
+    // reset the copy buffer
+    buffer_flush(&app->copy);
+    return !listener_count ? EX_NORMAL : rc;
+}
+
+
+
+//// main application loop ////
 
 int
 hdmi2usb_main(struct hdmi2usb *app) {
@@ -184,14 +232,14 @@ hdmi2usb_main(struct hdmi2usb *app) {
         switch (signal_received) {
             case SIGHUP:
                 log_critical("Reloading on SIGHUP");
-                rc = hdmi2usb_init(app, hdmi2usb_close(app, 0));
+                rc = hdmi2usb_init(app, hdmi2usb_close(app, EX_SUCCESS));
                 break;
             case SIGINT:
                 log_critical("Keyboard Quit");
-                rc = 3;
+                rc = EX_REQUEST;
                 break;
             default:
-
+                rc = hdmi2usb_process(app, rc);
                 break;
         }
     }

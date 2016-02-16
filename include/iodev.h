@@ -78,7 +78,8 @@ extern iodev_cfg_t *iodev_getcfg(iodev_t *iodev);
 extern const char *iodev_driver(iodev_t *iodev);
 
 extern int iodev_getfd(iodev_t *dev);
-extern int is_listener(iodev_t *dev);
+extern int iodev_is_listener(iodev_t *dev);
+extern int iodev_is_open(iodev_t *dev);
 
 extern int iodev_getstate(iodev_t *dev);
 extern int iodev_setstate(iodev_t *dev, int state);
