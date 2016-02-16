@@ -84,6 +84,7 @@ serial_open(iodev_t *dev) {
     dev->fd = open(cfg->portname, opts);
     if (dev->fd == -1) { // failed
         iodev_error("serial open '%s' (%d): %s", cfg->portname, errno, strerror(errno));
+        iodev_setstate(dev, IODEV_INACTIVE);
     } else {
         iodev_setstate(dev, IODEV_OPEN);
         if (tcsetattr(dev->fd, TCSANOW, cfg->termctl) == -1)
