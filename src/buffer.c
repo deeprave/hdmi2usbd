@@ -178,3 +178,57 @@ buffer_get(buffer_t *buffer, void *buf, size_t len) {
     }
     return len;
 }
+
+
+static size_t
+buffer_copymove(buffer_t *dst, buffer_t *src, size_t len, int move) {
+    // ajdust length for max bytes available in dst buffer
+    size_t d_avail = buffer_available(dst);
+    if (len > d_avail)
+        len = d_avail;
+    else d_avail = len;
+    // adjust length for max bytes available in the src buffer
+    size_t s_avail = buffer_used(src);
+    if (len > s_avail)
+        len = s_avail;
+    else s_avail = len;
+    // finally, trim if we have more bytes in src then can fit in dst
+    if (s_avail > d_avail)
+        s_avail = d_avail;
+    // dup hi and lo from source
+    size_t lo = src->b_lo;
+    size_t hi = src->b_hi;
+    // copy top half (if there is one)
+    if (lo > hi) {
+        size_t top = src->b_size - lo;
+        if (top > s_avail)
+            top = s_avail;
+        if (top)
+            buffer_put(dst, src->data + lo, top);
+        s_avail -= top;
+        lo = buffer_inc(src, lo, top);
+    }
+    // copy bottom half
+    if (s_avail) {
+        buffer_put(dst, src->data + lo, s_avail);
+        lo = buffer_inc(src, lo, s_avail);
+    }
+    // only advance the ptr in src buffer if we are moving
+    if (move) {
+        src->b_lo = lo;
+        src->b_hi = hi;
+    }
+    return len;
+}
+
+
+size_t
+buffer_copy(buffer_t *dst, buffer_t *src, size_t size) {
+    return buffer_copymove(dst, src, size, 0);
+}
+
+
+size_t
+buffer_move(buffer_t *dst, buffer_t *src, size_t size) {
+    return buffer_copymove(dst, src, size, 1);
+}

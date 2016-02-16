@@ -163,7 +163,38 @@ namespace {
         log_info("done.");
     }
 
-    TEST(BufferFunctions, testBufferWithIO) {
+    TEST(BufferFunctions, testBufferCopyMove) {
+        unsigned char buf[STRINGLENGTH+1];
+        for (int i =0; i < STRINGLENGTH; i++)
+            buf[i] = (unsigned char)('0' + i);
+        buf[STRINGLENGTH] = '\0';
+        log_info("testBufferCopyMove: buffsize tests");
+        for (int i =1; i < sizes; i++) {
+            size_t len_a, len_b, size = buffer_sizes[i];
+            buffer_t *a = buffer_init(NULL, size);
+            buffer_t *b = buffer_init(NULL, size);
+            log_info("%lu", size);
+            len_b = buffer_put(b, &buf, STRINGLENGTH);
+            EXPECT_EQ(STRINGLENGTH, len_b);
+            // now have STRINGLENGTH bytes in b (src)
+            len_a = buffer_used(a);
+            EXPECT_EQ(0, len_a);
+            size_t copied = buffer_copy(a, b, STRINGLENGTH*2);
+            EXPECT_EQ(STRINGLENGTH, copied);
+            len_a = buffer_used(a);
+            EXPECT_EQ(STRINGLENGTH, len_a);
+            len_b = buffer_used(b);
+            EXPECT_EQ(STRINGLENGTH, len_b);
+            copied = buffer_move(a, b, STRINGLENGTH*2);
+            EXPECT_EQ(STRINGLENGTH, copied);
+            len_a = buffer_used(a);
+            EXPECT_EQ(STRINGLENGTH*2, len_a);
+            len_b = buffer_used(b);
+            EXPECT_EQ(0, len_b);
+            buffer_free(b);
+            buffer_free(a);
+        }
+        log_info("done.");
     }
 
 } // namespace

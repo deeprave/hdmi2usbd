@@ -1,13 +1,13 @@
-HDMI2USB Project
-----------------
+HDMI2USBd
+---------
 
-This is a daemon designed for communicating with HDMI2USB devices, but may work
-for other purposes.
+hdmi2usbd is a daemon designed for communicating with HDMI2USB devices, but may 
+work for other purposes.
 
 This software implements a daemon that provides a tcp gateway to a local serial
 port primarily to provide (more) reliable communication with an hdmi2usb device
-due to its lack of flow control and internal buffering. In this mode it may also
-be useful for other purposes.
+to compensate for lack of flow control and internal buffering. In this mode it 
+may also be useful for other purposes.
 
 Additional objectives of this software planned to be implemented:
 
