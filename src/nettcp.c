@@ -49,6 +49,15 @@ tcp_accept(iodev_t *dev, int fd, struct sockaddr *addr) {
     iodev_notify("accepted connection from %s on fd=%d",
                  inet_ntop(addr->sa_family, sockaddr_addr(addr), paddr, sizeof(paddr)),
                  fd);
+    iodev_setstate(dev, IODEV_OPEN);
+    // set non-blocking
+    int opts = fcntl(dev->fd, F_GETFL);
+    if (opts < 0)
+        iodev_error("fcntl(%d, F_GETFL) error(%d): %s", dev->fd, errno, strerror(errno));
+    opts |= O_NONBLOCK;
+    if (fcntl(dev->fd, F_SETFL, opts) < 0)
+        iodev_error("fcntl(%d, F_SETFL) error(%d): %s", dev->fd, errno, strerror(errno));
+
     iodev_setstate(dev, IODEV_CONNECTED);
     return dev->fd = fd;
 }
@@ -77,6 +86,7 @@ tcp_open_listen(iodev_t *dev) {
         if (setsockopt(dev->fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1)
             iodev_error("setsockopt(%d) error(%d): %s", dev->fd, errno, strerror(errno));
 
+        iodev_setstate(dev, IODEV_OPEN);
         // set non-blocking
         int opts = fcntl(dev->fd, F_GETFL);
         if (opts < 0)
@@ -85,7 +95,6 @@ tcp_open_listen(iodev_t *dev) {
         if (fcntl(dev->fd, F_SETFL, opts) < 0)
             iodev_error("fcntl(%d, F_SETFL) error(%d): %s", dev->fd, errno, strerror(errno));
 
-        iodev_setstate(dev, IODEV_OPEN);
         // finally bind it and listen
         if (bind(dev->fd, cfg->local, cfg->local->sa_len) == -1) {
             iodev_error("socket bind error(%d): %s", errno, strerror(errno));
