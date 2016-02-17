@@ -72,6 +72,19 @@ serial_getcfg(iodev_t *sdev) {
 }
 
 
+static struct termios *
+serial_termios(struct termios *termctl, speed_t baudrate) {
+    cfmakeraw(termctl);
+    cfsetospeed(termctl, baudrate);
+    cfsetispeed(termctl, baudrate);
+    termctl->c_cflag &= ~(CSTOPB|CSIZE|PARENB|HUPCL|CRTSCTS);
+    termctl->c_cflag |= CS8|CREAD|CLOCAL;
+    termctl->c_iflag &= ~(IXON | IXOFF | IXANY);
+    termctl->c_iflag |= IGNBRK;
+    return termctl;
+}
+
+
 // device control
 static int
 serial_open(iodev_t *dev) {
@@ -87,14 +100,19 @@ serial_open(iodev_t *dev) {
         iodev_setstate(dev, IODEV_INACTIVE);
     } else {
         iodev_setstate(dev, IODEV_OPEN);
-        if (tcsetattr(dev->fd, TCSANOW, cfg->termctl) == -1)
-            iodev_error("serial setup '%s' (%d): %s", cfg->portname, errno, strerror(errno));
+        if (tcgetattr(dev->fd, cfg->termctl) == -1)
+            iodev_error("serial tcgetattr '%s' (%d): %s", cfg->portname, errno, strerror(errno));
         else {
-            if (ioctl(dev->fd, TIOCCBRK) == -1)
-                iodev_notify("ioctl(TIOCCBRK) '%s' (%d): %s", cfg->portname, errno, strerror(errno));
-            // set serial devices directly to "connected" state after successfully opened
-            iodev_setstate(dev, IODEV_CONNECTED);
-            return dev->fd;
+            serial_termios(cfg->termctl, cfg->baudrate);
+            if (tcsetattr(dev->fd, TCSANOW, cfg->termctl) == -1)
+                iodev_error("serial tcsetattr '%s' (%d): %s", cfg->portname, errno, strerror(errno));
+            else {
+                if (ioctl(dev->fd, TIOCCBRK) == -1)
+                    iodev_notify("ioctl(TIOCCBRK) '%s' (%d): %s", cfg->portname, errno, strerror(errno));
+                // set serial devices directly to "connected" state after successfully opened
+                iodev_setstate(dev, IODEV_CONNECTED);
+                return dev->fd;
+            }
         }
         // error fallthrough
         dev->close(dev, IOFLAG_NONE);
@@ -151,15 +169,7 @@ serial_create(iodev_t *dev, char const *devname, unsigned long baudrate, size_t 
     scfg->baudrate = baudrate;
 
     // Set up the initial termios
-    struct termios *termctl = calloc(1, sizeof(struct termios));
-    cfmakeraw(termctl);
-    cfsetospeed(termctl, (speed_t)scfg->baudrate);
-    cfsetispeed(termctl, (speed_t)scfg->baudrate);
-    termctl->c_cflag &= ~(CSTOPB|CSIZE|PARENB|CLOCAL|HUPCL|CRTSCTS);
-    termctl->c_cflag |= CS8|CREAD;
-    termctl->c_iflag &= ~(IXON | IXOFF | IXANY);
-    termctl->c_iflag |= IGNBRK;
-    scfg->termctl = termctl;
+    scfg->termctl = serial_termios(calloc(1, sizeof(struct termios)), (speed_t)baudrate);
 
     serial->open = serial_open;
     serial->close = serial_close;
