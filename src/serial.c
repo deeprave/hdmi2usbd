@@ -74,13 +74,18 @@ serial_getcfg(iodev_t *sdev) {
 
 static struct termios *
 serial_termios(struct termios *termctl, speed_t baudrate) {
+    // Raw mode (input and output processing disabled)
     cfmakeraw(termctl);
-    cfsetospeed(termctl, baudrate);
-    cfsetispeed(termctl, baudrate);
+    termctl->c_lflag &= ~(ECHO|ECHONL|ECHOE|ECHOK|ICANON|ISIG|IEXTEN);
+    termctl->c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL|IXON|IXOFF|IXANY);
+    // Disable parity, 8N1, flow control disabled
     termctl->c_cflag &= ~(CSTOPB|CSIZE|PARENB|HUPCL|CRTSCTS);
     termctl->c_cflag |= CS8|CREAD|CLOCAL;
-    termctl->c_iflag &= ~(IXON | IXOFF | IXANY);
     termctl->c_iflag |= IGNBRK;
+    termctl->c_oflag &= ~OPOST;
+    // Set the input and output baudrate
+    cfsetospeed(termctl, baudrate);
+    cfsetispeed(termctl, baudrate);
     return termctl;
 }
 
