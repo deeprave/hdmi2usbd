@@ -222,7 +222,7 @@ iodev_write_handler(iodev_t *dev) {
                 buffer_flush(&dev->tbuf);
                 iodev_setstate(dev, IODEV_CLOSING);
             } else { // advance the counter by amount written
-                buffer_get(&dev->rbuf, NULL, (size_t)rc);
+                buffer_get(&dev->tbuf, NULL, (size_t)rc);
             }
         }
     }
