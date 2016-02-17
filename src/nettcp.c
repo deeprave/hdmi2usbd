@@ -190,6 +190,15 @@ tcp_close(iodev_t *dev, int flags) {
 }
 
 
+static void
+tcp_close_accept(iodev_t *dev, int flags) {
+    tcp_close(dev, flags);
+    // Move closed -> inactive as we never reuse accept()ed connections
+    if (iodev_getstate(dev) == IODEV_CLOSED)
+        iodev_setstate(dev, IODEV_INACTIVE);
+}
+
+
 static int
 tcp_configure(iodev_t *dev, void * data) {
     return 0;
@@ -219,13 +228,16 @@ tcp_create(iodev_t *dev, struct sockaddr *local, struct sockaddr *remote, size_t
 iodev_t *
 tcp_create_listen(iodev_t *dev, struct sockaddr *local, size_t bufsize) {
     iodev_t *tcp = tcp_create(dev, local, NULL, 0);
+
     // we don't use bufsize for this socket since there is no IO
     // but use it for devices created via accept(), so record it here
     tcp->bufsize = bufsize;
-    // special "open" for listener
+
+    // special "open" and "read" for listen sockets
     tcp->open = tcp_open_listen;
     tcp->read_handler = tcp_accept_handler;
     tcp->set_masks = tcp_set_masks_listen;
+
     return tcp;
 }
 
@@ -233,14 +245,17 @@ tcp_create_listen(iodev_t *dev, struct sockaddr *local, size_t bufsize) {
 iodev_t *
 tcp_create_connect(iodev_t *dev, struct sockaddr *remote, size_t bufsize) {
     iodev_t *tcp = tcp_create(dev, NULL, remote, bufsize);
+
     // tcp->close = tcp_close_connect;
+
     return tcp;
 }
 
 
 iodev_t *
 tcp_create_accepted(iodev_t *dev, int fd, struct sockaddr *remote, size_t bufsize) {
-    iodev_t *net = tcp_create(dev, NULL, remote, bufsize);
-    tcp_accept(dev, fd, remote);
-    return net;
+    iodev_t *tcp = tcp_create(dev, NULL, remote, bufsize);
+    tcp_accept(tcp, fd, remote);
+    tcp->close = tcp_close_accept;
+    return tcp;
 }

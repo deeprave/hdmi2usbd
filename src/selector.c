@@ -69,6 +69,13 @@ selector_set(selector_t *selector, iodev_t *dev) {
 
 static iodev_t *
 selector_new_device(selector_t *selector) {
+    // first, look for an inactive slot
+    for (size_t index =1; index < array_count(&selector->devs); ++index) {
+        iodev_t *dev = array_get(&selector->devs, index);
+        if (iodev_getstate(dev) == IODEV_INACTIVE)
+            return dev;
+    }
+    // otherwise, append new one at end
     return (iodev_t *)array_new(&selector->devs);
 }
 

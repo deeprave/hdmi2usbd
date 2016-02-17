@@ -261,7 +261,7 @@ iodev_init(iodev_t *dev, iodev_cfg_t *cfg, size_t bufsize) {
     dev->state = IODEV_NONE;
     dev->bufsize = bufsize;
     buffer_init(&dev->rbuf, bufsize);
-    buffer_init(&dev->rbuf, bufsize);
+    buffer_init(&dev->tbuf, bufsize);
     // default i/o functions
     dev->open = iodev_open;
     dev->close = iodev_close;
