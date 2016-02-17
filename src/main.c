@@ -277,7 +277,7 @@ main(int argc, char * const *argv) {
             .listen_addr = "localhost",
             .listen_port = 8501,
             .listen_flags = 0,
-            .loop_time = 1000U,
+            .loop_time = 20U,
         }
     };
 
