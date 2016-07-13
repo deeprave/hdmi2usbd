@@ -19,10 +19,13 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/errno.h>
+#include <signal.h>
 
 #ifdef __APPLE__
 #undef daemon
 extern int daemon(int, int);
+#else
+#include <unistd.h>
 #endif
 
 
@@ -66,12 +69,12 @@ static int sigvec_index = 0;
 static struct {
     int sig;
     void (*handler)(int);
-} sigstack[MAX_SIGVEC];
+} signal_stack[MAX_SIGVEC];
 
 static int
 push_sighandler(int sig, void (*new_handler)(int)) {
-    sigstack[sigvec_index].sig = sig;
-    sigstack[sigvec_index].handler = signal(sig, new_handler);
+    signal_stack[sigvec_index].sig = sig;
+    signal_stack[sigvec_index].handler = signal(sig, new_handler);
     return sigvec_index < MAX_SIGVEC ? ++sigvec_index : sigvec_index;
 }
 
@@ -79,7 +82,7 @@ static int
 pop_sighandler() {
     if (sigvec_index) {
         --sigvec_index;
-        signal(sigstack[sigvec_index].sig, sigstack[sigvec_index].handler);
+        signal(signal_stack[sigvec_index].sig, signal_stack[sigvec_index].handler);
     }
     return sigvec_index;
 }
@@ -119,7 +122,7 @@ hdmi2usb_init(struct hdmi2usb *app, int rc) {
             struct sockaddr *addr = ipaddriter_next(&iter);
             switch (addr->sa_family) {
                 case AF_INET: {
-                    struct sockaddr_in *s4 = (struct sockaddr_in *) addr;
+                    struct sockaddr_in *s4 = (void *) addr;
                     if (s4->sin_addr.s_addr == INADDR_ANY) {
                         listen_ports |= 4;
                     } else if ((listen_ports & 1) == 0) {  // create ipv4 listen socket
@@ -131,7 +134,7 @@ hdmi2usb_init(struct hdmi2usb *app, int rc) {
                     break;
                 }
                 case AF_INET6: {
-                    struct sockaddr_in6 *s6 = (struct sockaddr_in6 *) addr;
+                    struct sockaddr_in6 *s6 = (void *) addr;
                     struct in6_addr in6addr = IN6ADDR_ANY_INIT;
                     if (IN6_ARE_ADDR_EQUAL(&s6->sin6_addr, &in6addr)) {
                         listen_ports |= 4;

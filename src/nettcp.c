@@ -101,7 +101,7 @@ tcp_open_listen(iodev_t *dev) {
         }
 
         // finally bind it and listen
-        if (bind(dev->fd, cfg->local, cfg->local->sa_len) == -1) {
+        if (bind(dev->fd, cfg->local, cfg->addrlen) == -1) {
             iodev_error("socket bind error(%d): %s", errno, strerror(errno));
             dev->close(dev, IOFLAG_INACTIVE);
         } else if (listen(dev->fd, BACKLOG_SIZE) < 0) {
@@ -200,7 +200,7 @@ tcp_close_accept(iodev_t *dev, int flags) {
 
 
 static int
-tcp_configure(iodev_t *dev, void * data) {
+tcp_configure(iodev_t *dev, void *data) {
     return 0;
 }
 
@@ -213,6 +213,7 @@ tcp_create(iodev_t *dev, struct sockaddr *local, struct sockaddr *remote, size_t
 
     // Initialise the extras
     tcp_cfg_t *tcfg = tcp_getcfg(tcp);
+    tcfg->addrlen = local != NULL ? sockaddr_len(local) : remote != NULL ? sockaddr_len(remote) : 0;
     tcfg->local = sockaddr_dup(local);
     tcfg->remote = sockaddr_dup(remote);
 

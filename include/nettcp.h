@@ -11,6 +11,7 @@ typedef struct tcp_cfg_s tcp_cfg_t;
 
 struct tcp_cfg_s {
     iodev_cfg_t cfg;
+    socklen_t addrlen;          // length of address info
     struct sockaddr *local;
     struct sockaddr *remote;
 };
