@@ -10,7 +10,9 @@ allows concurrent connection from multiple clients, consumers and controllers.
 
 Additional objectives of this software being implemented:
 
-**hdmi2usbmon**
+hdmi2usbmon_.
+.. _hdmi2usbmon: /deeprave/hdmi2usbmon
+
  - this is a python package interface to hdmi2usb devices, employing
    hdmi2usbd to connect to a device. This package will provide an API
    suitable for querying and controlling HDMI2USB devices.
