@@ -12,7 +12,6 @@ typedef struct ipaddrs_s ipaddrs_t;
 struct ipaddrs_s {
     unsigned int alloc;
     array_t na_addr;
-    int na_socktype;
 };
 
 struct sockaddr;
@@ -31,6 +30,7 @@ struct sockaddr *ipaddrs_get(ipaddrs_t *addrs, size_t index);
 extern int netutils_error(const char *fmt, ...) __attribute__((format (printf, 1, 2)));
 
 // helper
+extern socklen_t sockaddr_len(struct sockaddr *addr);
 extern void *sockaddr_addr(struct sockaddr *addr);
 extern unsigned short sockaddr_port(struct sockaddr *addr);
 extern struct sockaddr *sockaddr_dup(struct sockaddr *addr);
@@ -39,7 +39,7 @@ extern struct sockaddr *sockaddr_dup(struct sockaddr *addr);
 
 ipaddrs_t *ipaddrs_init_hint(ipaddrs_t *addrs, char const *svc, struct addrinfo *addr);
 ipaddrs_t *ipaddrs_init(ipaddrs_t *addrs, char const *svc, int flags, int family, int socktype);
-struct sockaddr *ipaddrs_add(ipaddrs_t *addrs, struct sockaddr *addr, size_t addrlen);
+struct sockaddr *ipaddrs_add(ipaddrs_t *addrs, struct sockaddr *addr);
 void ipaddrs_delete(ipaddrs_t *addrs, size_t index);
 
 // sockaddr iterator
