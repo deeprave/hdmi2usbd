@@ -1,4 +1,3 @@
 /.idea
 /build/
-/tests/googletest
-
+/tests/googletest/
