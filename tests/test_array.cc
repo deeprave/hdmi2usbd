@@ -29,18 +29,20 @@ namespace {
         size_t number;
     };
 
-    #define I 8
-    #define N (I * 5 + 1)
+    #define I (size_t)8
+    #define N (size_t)(I * 5 + 1)
+    #define ZERO (size_t)0
+    #define NULLPTR (void*)0
 
     TEST_F(ArrayFunctions, arrayCreationAuto) {
         // allocate on stack
         array_t A = {};
         array_init(&A, sizeof(element), I); // init must be called in this case
-        EXPECT_EQ(0, array_count(&A));
+        EXPECT_EQ(ZERO, array_count(&A));
         // This will generate a bounds error and return NULL
-        EXPECT_EQ((void *)0, array_get(&A, 0));
+        EXPECT_EQ(NULLPTR, array_get(&A, 0));
         // Add lots of elements
-        for (size_t i=0; i < N; i++) {
+        for (size_t i=ZERO; i < N; i++) {
             element *e = (element *)array_new(&A);
             e->number = i;
         }
@@ -49,18 +51,18 @@ namespace {
         // Free the array
         array_free(&A);
         // A is auto, so still exists
-        EXPECT_EQ(0, array_count(&A));
-        EXPECT_EQ(A.data, (void*)0);
+        EXPECT_EQ(ZERO, array_count(&A));
+        EXPECT_EQ(A.data, NULLPTR);
     };
 
     TEST_F(ArrayFunctions, arrayCreateHeap) {
         // allocate on heap
         array_t *A = array_alloc(sizeof(element), I);   // init already done
-        EXPECT_EQ(0, array_count(A));
+        EXPECT_EQ(ZERO, array_count(A));
         // This will generate a bounds error and return NULL
-        EXPECT_EQ((void *)0, array_get(A, 0));
+        EXPECT_EQ(NULLPTR, array_get(A, 0));
         // Add lots of elements
-        for (size_t i=0; i < N; i++) {
+        for (size_t i=ZERO; i < N; i++) {
             element *e = (element *)array_new(A);
             e->number = i;
         }
@@ -74,7 +76,7 @@ namespace {
     TEST_F(ArrayFunctions, arrayErrorFunction) {
         array_t A = {};
         // Now generate an error, same as above
-        EXPECT_EQ((void *)0, array_get(&A, 0));
+        EXPECT_EQ(NULLPTR, array_get(&A, 0));
         array_free(&A);
     }
 
@@ -150,7 +152,7 @@ namespace {
         ASSERT_EQ(N-3, array_count(A));
         while (rc > 0 && rc != (size_t)-1)
             rc = array_delete(A, 0);
-        EXPECT_EQ(0, rc);
+        EXPECT_EQ(ZERO, rc);
         // check that error is generated and we get error result
         rc = array_delete(A, 0);
         EXPECT_EQ((size_t)-1, rc);
@@ -161,14 +163,14 @@ namespace {
 
     TEST_F(ArrayFunctions, arrayIndexAndPut) {
         array_t * A = array_alloc(sizeof(element), I);
-        for (size_t i=0; i < N; i++) {
+        for (size_t i=ZERO; i < N; i++) {
             element e = {i};
             element *ee = (element *)array_append(A, &e);
             size_t index = array_index(A, ee);
             EXPECT_EQ(i, index);
         }
         EXPECT_EQ(N, array_count(A));
-        for (size_t i =0; i < N; i++) {
+        for (size_t i =ZERO; i < N; i++) {
             size_t v = N - i - 1;
             element e = {v};
             element *ee = (element *)array_put(A, &e, i);
