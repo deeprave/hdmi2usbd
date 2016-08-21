@@ -50,15 +50,17 @@ Building the test executables requires the `googletest
 library <https://github.com/google/googletest>`__, version 1.7 or
 greater.
 
-This needs to be cloned into the top level\ ``tests``\ subdirectory, and
-returning to the\ ``build`` folder and executing a slightly different
-cmake command.
+::
+
+    $ git submodule init
+    $ git submodule update
+
+To build with tests, clear out and rebuild the\ ``build``\ directory, change to it and run:
 
 ::
 
-    $ cd tests
-    $ git clone https://github.com/google/googletest
-    $ cd ../build
+    $ rm -rf build/*
+    $ cd build
     $ cmake -Dtests=ON ..
     $ make
 
