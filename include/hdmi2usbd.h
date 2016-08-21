@@ -7,7 +7,8 @@
 
 #include "selector.h"
 
-#define HDMI2USBD_VERSION "0.1"
+
+#define HDMI2USBD_VERSION "0.2"
 #define HDMI2USBD_NAME "hdmi2usbd"
 
 #define MAX_SERIAL_SPECS 31

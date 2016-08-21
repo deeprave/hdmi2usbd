@@ -66,9 +66,9 @@ namespace {
 
     TEST_F(IpaddrsFunctions, ipAddrAdd) {
         struct addrinfo hints = {
-            ai_flags : AI_PASSIVE,
-            ai_family : AF_UNSPEC,
-            ai_socktype : SOCK_STREAM
+            .ai_flags = AI_PASSIVE,
+            .ai_family = AF_UNSPEC,
+            .ai_socktype = SOCK_STREAM
         };
         struct addrinfo *ainfo;
         for (size_t hostindex = 0; hostindex == 0 || hostnames[hostindex]; ++hostindex) {
@@ -101,9 +101,9 @@ namespace {
 
     TEST_F(IpaddrsFunctions, ipAddrDelete) {
         struct addrinfo hints = {
-                ai_flags : AI_PASSIVE,
-                ai_family : AF_UNSPEC,
-                ai_socktype : SOCK_STREAM,
+                .ai_flags = AI_PASSIVE,
+                .ai_family = AF_UNSPEC,
+                .ai_socktype = SOCK_STREAM,
         }, *ainfo;
         for (size_t hostindex = 0; hostindex == 0 || hostnames[hostindex]; ++hostindex) {
             // don't normally need to do this, but we need to handle this manually for testing

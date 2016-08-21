@@ -14,6 +14,7 @@ struct tcp_cfg_s {
     socklen_t addrlen;          // length of address info
     struct sockaddr *local;
     struct sockaddr *remote;
+    struct stringstore_s *linebuffer;
 };
 
 extern tcp_cfg_t *tcp_getcfg(iodev_t *sdev);

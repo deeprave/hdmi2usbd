@@ -96,8 +96,10 @@ iodev_alloc_cfg(size_t size, const char *name, void (*free_cfg)(iodev_cfg_t *)) 
 
 void
 iodev_free_cfg(iodev_cfg_t *cfg) {
-    cfg->free_cfg(cfg);
-    free(cfg);
+    if (cfg != NULL) {
+        cfg->free_cfg(cfg);
+        free(cfg);
+    }
 }
 
 
@@ -279,12 +281,14 @@ iodev_init(iodev_t *dev, iodev_cfg_t *cfg, size_t bufsize) {
 
 void
 iodev_free(iodev_t *dev) {
-    buffer_free(&dev->rbuf);
-    buffer_free(&dev->tbuf);
-    iodev_free_cfg(dev->cfg);
-    if (dev->alloc == IODEV_ALLOC) {
-        dev->alloc = 0;
-        free(dev);
+    if (dev != NULL) {
+        buffer_free(&dev->rbuf);
+        buffer_free(&dev->tbuf);
+        iodev_free_cfg(dev->cfg);
+        if (dev->alloc == IODEV_ALLOC) {
+            dev->alloc = 0;
+            free(dev);
+        }
     }
 }
 
