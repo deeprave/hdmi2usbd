@@ -41,6 +41,7 @@ stringstore_free(stringstore_t *pstore) {
     if (pstore != NULL) {
         // Free the store if we originally allocated it
         free(pstore->ss_buff);
+        pstore->ss_buff = NULL;
         if (pstore->alloc == STRSTORE_ALLOC) {
             pstore->alloc = 0; // prevent accidental re-free
             free(pstore);
@@ -104,7 +105,7 @@ strstore_compact(stringstore_t *pstore) {
     return strstore_resize(pstore, 0);
 }
 
-// strstore_append: append/insert arbitrary data into the store, nul terminating if requested
+// strstore_append: append/insert data into the store
 
 size_t
 stringstore_store(stringstore_t *pstore, void const *value, size_t length, size_t at) {
@@ -127,6 +128,13 @@ stringstore_store(stringstore_t *pstore, void const *value, size_t length, size_
     return length;
 }
 
+// append data to a stringstore
+
+size_t
+stringstore_append(stringstore_t *pstore, void const *value, size_t length) {
+    return stringstore_store(pstore, value, length, SS_END);
+}
+
 // stringstore_store: store a nul terminated string in the store
 
 size_t
@@ -147,6 +155,9 @@ stringstore_iterator(stringstore_t *pstore) {
 }
 
 // stringstore_next: return next string (and length) via iterator, NULL at end
+// string length returned by plength
+// if delim is NULL, strings are terminated by NUL or end of buffer
+// if delim is NULL, strings are terminated by any char in delim
 
 void const *
 stringstore_next(stringstore_iterator_t *piter, size_t *plength, char const *delim) {
@@ -156,10 +167,17 @@ stringstore_next(stringstore_iterator_t *piter, size_t *plength, char const *del
     if (piter->offset < pstore->ss_used) {
         ptr = (const char *) stringstore_at(piter);
         size_t remaining_bytes = pstore->ss_used - piter->offset;
+        int found_eos = (delim == NULL);
         while (size < remaining_bytes) {
             char ch = ptr[size++];
-            if (ch == '\0' || (delim != NULL && strchr(delim, ch)))
+            if (ch == '\0' || (delim != NULL && strchr(delim, ch) != NULL)) {
+                found_eos = 1;
                 break;
+            }
+        }
+        if (!found_eos) {
+            ptr = NULL;
+            size = 0;
         }
     }
     if (plength)
@@ -173,6 +191,13 @@ char const *
 stringstore_nextstr(stringstore_iterator_t *piter, size_t *plength) {
     return (char const *)stringstore_next(piter, plength, "\n");
 }
+
+
+size_t
+stringstore_remaining(stringstore_iterator_t *piter) {
+    return stringstore_length(piter->store) - piter->offset;
+}
+
 
 // stringstore_split: split string via list of delimiters
 

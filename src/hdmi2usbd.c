@@ -20,6 +20,7 @@
 #include <arpa/inet.h>
 #include <sys/errno.h>
 #include <signal.h>
+#include <sys/time.h>
 
 #ifdef __APPLE__
 #undef daemon
@@ -33,6 +34,7 @@ extern int daemon(int, int);
 #include "logging.h"
 #include "device.h"
 #include "netutils.h"
+#include "stringstore.h"
 
 
 //// Logging interface ////
@@ -181,13 +183,81 @@ hdmi2usb_process_serial_data(struct hdmi2usb *app, iodev_t *serial) {
     size_t s_bytes = iodev_is_open(serial) ? buffer_used(iodev_rbuf(serial)) : 0;
     if (s_bytes) {
         // process the datas here
-        //... TODO
-        // pick up anything left over and copy to network connections (if any)
+        //... TODO (maybe?)
+        // pick up anything left over and queue for output to network connections
         s_bytes = buffer_move(&app->copy, iodev_rbuf(serial), s_bytes);
     }
     return s_bytes;
 }
 
+//
+// hdmi2usb_process_client_data()
+// read pending input from network connections and buffer this
+// for later processing in hdmi2usb_process_client_commands()
+// we don't send this directly/immediately because there are
+// limitations on the number of commands we can process at once
+// and the rate at which they can be processed.
+
+static void
+hdmi2usb_process_client_data(struct hdmi2usb *app, iodev_t *dev) {
+    buffer_t *rbuf = iodev_rbuf(dev);
+    size_t r_bytes = buffer_used(rbuf);
+    if (r_bytes) {
+        stringstore_t *linebuf = iodev_stringstore(dev);
+        if (linebuf) {
+            void *data = alloca(r_bytes);
+            r_bytes = buffer_get(rbuf, data, r_bytes);
+            stringstore_append(linebuf, data, r_bytes);
+        }
+    }
+}
+
+// retrieve the current time in milliseconds
+static millitime_t
+get_millisecond_time() {
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    return (now.tv_sec * 1000UL) + now.tv_usec;
+}
+
+// returns the raw difference between two millisecond time stamps
+// if now < len then result may be negative
+static long
+time_difference(millitime_t now, millitime_t then) {
+    return (long)(now - (long)then);
+}
+
+//
+// hdmi2usb_process_client_commands()
+// read lines of text from the connection's input buffer and
+// send these to the hdmi2usb device
+// commands send across all connections need to be rate limited as
+// some of these will result in the device not accepting input for
+// a short period when the command is executed.
+
+static void
+hdmi2usb_process_client_commands(struct hdmi2usb *app, iodev_t *serial, iodev_t *dev, unsigned long now) {
+    // Skip even checking unless it is time to send another command
+    if (time_difference(now, app->last_command) > 0L) {
+        // make sure we are accepting input from this device
+        stringstore_t *linebuf = dev->linebuf;
+        if (linebuf != NULL) {
+            stringstore_iterator_t iter = stringstore_iterator(linebuf);
+            size_t length =0;
+            // Get the next command (if there is one)
+            char const *command = stringstore_nextstr(&iter, &length);
+            if (command != NULL && length > 0) {
+                // There is one: send it to the serial device
+                iodev_write(serial, command, length);
+                // Remove the command from the line buffer, and reset time last command was sent
+                stringstore_consume(linebuf, length);
+                // Need more accurate time here, don't want the latency of the processing loop omitted
+                app->last_command = get_millisecond_time();
+            }
+        }
+
+    }
+}
 
 // Process cycle for the application
 
@@ -195,15 +265,17 @@ static int
 hdmi2usb_process(struct hdmi2usb *app, int rc) {
     // basic stuff
     // The serial device is alaways at index 0 in the managed devices array.
-    // It must be open and active, else everything else is pointless
+    // It must be open and active, if not everything else is pointless
     iodev_t *serial = selector_get_device(&app->selector, 0);
     if (serial == NULL || iodev_getstate(serial) == IODEV_INACTIVE)
         return EX_NORMAL;
+
     // At least one listen port must also be open, check for this
-    // when we scan ports for application I/O
+    // when we iterate ports for application I/O processing
     size_t s_bytes = hdmi2usb_process_serial_data(app, serial);
     int listener_count = 0;
     int connect_count = 0;
+    unsigned long now = get_millisecond_time(); // close enough, void repeating too much
     for (size_t index = 1; index < selector_device_count(&app->selector); index++) {
         iodev_t *dev = selector_get_device(&app->selector, index);
         if (iodev_is_listener(dev))
@@ -214,11 +286,14 @@ hdmi2usb_process(struct hdmi2usb *app, int rc) {
             if (s_bytes)
                 buffer_copy(iodev_tbuf(dev), &app->copy, s_bytes);
             // process input from network connection
-            //... TODO
+            hdmi2usb_process_client_data(app, dev);
+            // send any pending input on this connection to the device (maybe)
+            hdmi2usb_process_client_commands(app, serial, dev, now);
         }
     }
     // reset the copy buffer
     buffer_flush(&app->copy);
+    // exit if there are no active listeners
     return !listener_count ? EX_NORMAL : rc;
 }
 
@@ -238,6 +313,8 @@ hdmi2usb_main(struct hdmi2usb *app) {
                 rc = hdmi2usb_init(app, hdmi2usb_close(app, EX_SUCCESS));
                 break;
             case SIGINT:
+            case SIGQUIT:
+            case SIGTERM:
                 log_critical("Keyboard Quit");
                 rc = EX_REQUEST;
                 break;

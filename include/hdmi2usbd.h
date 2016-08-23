@@ -37,14 +37,18 @@ struct hdmi2usb_opts {
     int listen_flags;
     unsigned iobufsize;
     unsigned long loop_time;
+    unsigned long command_time;
 };
+
+typedef unsigned long millitime_t;
 
 // working data
 struct hdmi2usb {
     struct hdmi2usb_opts opts;
-    selector_t selector;
-    buffer_t proc;          // for processing serial input
-    buffer_t copy;          // output to network connections
+    selector_t selector;        // selector (including device array)
+    buffer_t proc;              // serial input (pre-processing)
+    buffer_t copy;              // output to network connections (post-processing)
+    millitime_t last_command;   // timestamp of last command
 };
 
 

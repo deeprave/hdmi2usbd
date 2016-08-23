@@ -33,6 +33,8 @@ enum closeFlags {
 typedef struct iodev_s iodev_t;
 typedef struct selector_s selector_t;
 typedef struct iodev_cfg_s iodev_cfg_t;
+typedef struct stringstore_s stringstore_t;
+
 
 struct iodev_cfg_s {
     const char *name;       // driver identifier
@@ -54,6 +56,7 @@ struct iodev_s {
     size_t bufsize;             // default buffer size (accept sockets)
     buffer_t rbuf;              // receive buffer
     buffer_t tbuf;              // transmit buffer
+    stringstore_t *linebuf;     // received command line buffer
 
     // device control
     int (*open)(iodev_t *dev);
@@ -86,6 +89,7 @@ extern int iodev_setstate(iodev_t *dev, int state);
 
 extern buffer_t *iodev_tbuf(iodev_t *dev);
 extern buffer_t *iodev_rbuf(iodev_t *dev);
+extern stringstore_t *iodev_stringstore(iodev_t *dev);
 
 extern selector_t *getselector(iodev_t *dev);
 extern void setselector(iodev_t *dev, selector_t *selector);

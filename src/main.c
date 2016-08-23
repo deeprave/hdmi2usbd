@@ -18,7 +18,7 @@
 
 
 // short options
-const char shortopts[] = "p:s:l:b:L:equF46vV::d::Dh";
+const char shortopts[] = "p:s:l:b:L:c:equF46vV::d::Dh";
 // long options
 const struct option longopts[] = {
 //  { char*name, int has_arg, int *flag, int val }
@@ -27,6 +27,7 @@ const struct option longopts[] = {
     { "bufsize",    required_argument,  NULL,           'b' },
     { "listen",     required_argument,  NULL,           'l' },
     { "log",        required_argument,  NULL,           'L' },
+    { "ctime",      required_argument,  NULL,           'c' },
     { "echo",       no_argument,        NULL,           'e' },
     { "quiet",      no_argument,        NULL,           'q' },
     { "utc",        no_argument,        NULL,           'u' },
@@ -47,6 +48,7 @@ const char *helpopts[][3] = {
     { "2048",           "buffer_size",              "set default iobuffer size" },
     { "localhost:8501", "[ip/hostname]:portnum",    "set listen address"},
     { NULL,             "FILENAME",                 "log to FILENAME (may contain strftime(3) strings)" },
+    { "2000",           "TIMEOUT (ms)",             "minimum wait time between sending commands" },
     { NULL,             NULL,                       "echo log to stdout (twice for stderr)" },
     { NULL,             NULL,                       "don't echo log" },
     { NULL,             NULL,                       "log dates as UTC"},
@@ -128,6 +130,17 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                     }
                 }
                 break;
+            case 'c': {
+                char *endptr = optarg;
+                unsigned long cmdtime = strtoul(optarg, &endptr, 10);
+                if (endptr != NULL && *endptr == '\0') {
+                    opts->command_time = cmdtime;
+                    break;
+                }
+                fprintf(stderr, "invalid or missing command time: '%s'\n", optarg);
+                rc = usage(stderr, EX_STARTUP);
+                break;
+            }
             case '4':
                 opts->logflags ^= AF_INET;
                 break;
@@ -277,7 +290,8 @@ main(int argc, char * const *argv) {
             .listen_addr = "localhost",
             .listen_port = 8501,
             .listen_flags = 0,
-            .loop_time = 20U,
+            .loop_time = 20UL,
+            .command_time = 2000UL
         }
     };
 

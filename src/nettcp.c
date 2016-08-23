@@ -30,7 +30,6 @@ tcp_free_cfg(iodev_cfg_t *cfg) {
         tcp_cfg_t *tcpcfg = (tcp_cfg_t *)cfg;
         free(tcpcfg->local);
         free(tcpcfg->remote);
-        stringstore_free(tcpcfg->linebuffer);
     }
 }
 
@@ -208,7 +207,6 @@ tcp_configure(iodev_t *dev, void *data) {
     return 0;
 }
 
-
 static iodev_t *
 tcp_create(iodev_t *dev, struct sockaddr *local, struct sockaddr *remote, size_t bufsize, int with_linebuf) {
     // First create the basic (slightly larger) config
@@ -221,7 +219,7 @@ tcp_create(iodev_t *dev, struct sockaddr *local, struct sockaddr *remote, size_t
     tcfg->local = sockaddr_dup(local);
     tcfg->remote = sockaddr_dup(remote);
     if (with_linebuf)
-        tcfg->linebuffer = stringstore_init(NULL);
+        dev->linebuf = stringstore_init(NULL);
 
     // default functions
     tcp->open = tcp_open;

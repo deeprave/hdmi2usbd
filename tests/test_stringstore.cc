@@ -9,7 +9,7 @@ extern "C" {
 }
 
 #define STRSTORE_ALLOC      0x5a1dc51
-#define MY_STRSTORE_SIZE    128
+#define MY_STRSTORE_SIZE    (size_t)128
 
 namespace {
 
@@ -86,7 +86,7 @@ namespace {
         fill_stringstore(pstore);
         run_basic_tests(pstore, MY_STRSTORE_SIZE*2, MY_STRSTORE_SIZE);
 
-        int i =0;
+        size_t i =0;
         size_t stringlength =0;
         for (i = 0; i < NUMBER_OF_TESTSTRINGS; i++)
             stringlength += strlen(TESTSTRINGS[i]);
@@ -99,11 +99,11 @@ namespace {
         size_t length, bytecount =0;
         char const *s;
         while ((s = stringstore_nextstr(&iter, &length)) != NULL) {
-            ASSERT_EQ(std::strncmp(s, fullstring, length), 0);
+            ASSERT_EQ(strncmp(s, fullstring, length), 0);
             bytecount += length;
         }
         ASSERT_NE(length, stringlength); // last one should be short
-        ASSERT_GE(bytecount, MY_STRSTORE_SIZE);
+        ASSERT_GE(bytecount, MY_STRSTORE_SIZE - stringstore_remaining(&iter));
 
         stringstore_free(pstore);
     }
@@ -125,8 +125,7 @@ namespace {
             linecount++;
 
         int stringcount = stringstore_split(pstore, "\n");
-        // stringcount+1 here as split does not count the last non-newline terminated string
-        ASSERT_EQ(linecount, stringcount + 1);
+        ASSERT_EQ(linecount, stringcount);
 
         linecount = 0;
         while ((s = stringstore_nextstr(&iter, &length)) != NULL)

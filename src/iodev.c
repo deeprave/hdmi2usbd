@@ -10,6 +10,7 @@
 #include <sys/errno.h>
 
 #include "iodev.h"
+#include "stringstore.h"
 
 #define IODEV_ALLOC 0x25a1da5
 
@@ -23,6 +24,7 @@ int iodev_is_listener(iodev_t *dev) { return dev->listener; }
 int iodev_is_open(iodev_t *dev) { return iodev_getstate(dev) >= IODEV_OPEN; }
 buffer_t *iodev_tbuf(iodev_t *dev) { return &dev->tbuf; }
 buffer_t *iodev_rbuf(iodev_t *dev) { return &dev->rbuf; }
+stringstore_t *iodev_stringstore(iodev_t *dev) { return dev->linebuf; }
 
 selector_t *getselector(iodev_t *dev) { return dev->selector; }
 void setselector(iodev_t *dev, selector_t *selector) { dev->selector = selector; }
@@ -285,6 +287,7 @@ iodev_free(iodev_t *dev) {
         buffer_free(&dev->rbuf);
         buffer_free(&dev->tbuf);
         iodev_free_cfg(dev->cfg);
+        stringstore_free(dev->linebuf);
         if (dev->alloc == IODEV_ALLOC) {
             dev->alloc = 0;
             free(dev);
