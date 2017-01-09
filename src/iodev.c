@@ -188,7 +188,7 @@ iodev_read_handler(iodev_t *dev) {
     else {
         size_t available = buffer_available(&dev->rbuf);
         void *tmp = alloca(available);
-        rc = read(dev->fd, tmp, available);
+        rc = iodev_read(dev, tmp, available);
         if (rc > 0)
             buffer_put(&dev->rbuf, tmp, (size_t)rc);
         else {
@@ -219,7 +219,7 @@ iodev_write_handler(iodev_t *dev) {
         else {
             void *tmp = alloca(available);
             buffer_peek(&dev->tbuf, tmp, available);
-            rc = write(dev->fd, tmp, available);
+            rc = iodev_write(dev, tmp, available);
             if (rc < 0) {
                 iodev_error("iodev %s write error(%d): %s", cfg->name, errno, strerror(errno));
                 buffer_flush(&dev->rbuf);
@@ -242,12 +242,20 @@ iodev_except_handler(iodev_t *dev) {
 
 ssize_t
 iodev_read(iodev_t *dev, void *buf, size_t len) {
-    return not_implemented(dev, "read");
+    if (dev == NULL || !iodev_is_open(dev)) {
+        iodev_error("iodev.read() called with invalid or closed device");
+        return -1;
+    }
+    return read(dev->fd, buf, len);
 }
 
 ssize_t
 iodev_write(iodev_t *dev, void const *buf, size_t len) {
-    return not_implemented(dev, "write");
+    if (dev == NULL || !iodev_is_open(dev)) {
+        iodev_error("iodev.write() called with invalid or closed device");
+        return -1;
+    }
+    return write(dev->fd, buf, len);
 }
 
 
