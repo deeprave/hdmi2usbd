@@ -222,7 +222,7 @@ iodev_write_handler(iodev_t *dev) {
                 iodev_error("iodev %s write error(%d): %s", cfg->name, errno, strerror(errno));
                 buffer_flush(&dev->rbuf);
                 buffer_flush(&dev->tbuf);
-                iodev_setstate(dev, IODEV_NONE);
+                dev->close(dev, IODEV_NONE);
             } else { // advance the counter by amount written
                 buffer_get(&dev->tbuf, NULL, (size_t)rc);
             }
