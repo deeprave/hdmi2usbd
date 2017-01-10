@@ -149,10 +149,8 @@ iodev_set_masks(iodev_t *dev, fd_set *r, fd_set *w, fd_set *x) {
                 FD_SET(dev->fd, w);
                 FD_SET(dev->fd, x);
                 is_active++;
-            } else {
-                FD_SET(dev->fd, x);
+            } else
                 dev->close(dev, IOFLAG_NONE);
-            }
             break;
         case IODEV_NONE:        // default (startup) state
         case IODEV_CLOSED:      // currently closed, due for reopen
@@ -198,7 +196,7 @@ iodev_read_handler(iodev_t *dev) {
                 iodev_notify("iodev %s EOF from fd %d, closing", cfg->name, dev->fd);
             buffer_flush(&dev->rbuf);
             buffer_flush(&dev->tbuf);
-            iodev_setstate(dev, IODEV_CLOSING);
+            dev->close(dev, IODEV_CLOSED);
         }
     }
     return rc;
@@ -224,7 +222,7 @@ iodev_write_handler(iodev_t *dev) {
                 iodev_error("iodev %s write error(%d): %s", cfg->name, errno, strerror(errno));
                 buffer_flush(&dev->rbuf);
                 buffer_flush(&dev->tbuf);
-                iodev_setstate(dev, IODEV_CLOSING);
+                iodev_setstate(dev, IODEV_NONE);
             } else { // advance the counter by amount written
                 buffer_get(&dev->tbuf, NULL, (size_t)rc);
             }
@@ -236,7 +234,9 @@ iodev_write_handler(iodev_t *dev) {
 
 static ssize_t
 iodev_except_handler(iodev_t *dev) {
-    return not_implemented(dev, "except_handler");
+    int fd = dev->fd, err = errno;
+    dev->close(dev, IODEV_NONE);
+    return iodev_error("exception fd %d, device = %s error(%d): %s", fd, iodev_driver(dev), err, strerror(err));
 }
 
 
