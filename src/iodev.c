@@ -158,7 +158,6 @@ iodev_set_masks(iodev_t *dev, fd_set *r, fd_set *w, fd_set *x) {
             break;
         case IODEV_PENDING:     // waiting for open to complete
             FD_SET(dev->fd, r);
-            FD_SET(dev->fd, x);
             is_active++;
             break;
         case IODEV_OPEN:        // open/operating
@@ -256,7 +255,7 @@ iodev_write(iodev_t *dev, void const *buf, size_t len) {
         return -1;
     }
     if (buf != NULL && len > 0)
-        buffer_put(&dev->rbuf, buf, len);
+        buffer_put(&dev->tbuf, buf, len);
     return len;
 }
 
