@@ -217,7 +217,7 @@ iodev_write_handler(iodev_t *dev) {
         else {
             void *tmp = alloca(available);
             buffer_peek(&dev->tbuf, tmp, available);
-            rc = iodev_write(dev, tmp, available);
+            rc = write(dev->fd, tmp, available);
             if (rc < 0) {
                 iodev_error("iodev %s write error(%d): %s", cfg->name, errno, strerror(errno));
                 buffer_flush(&dev->rbuf);
@@ -255,7 +255,9 @@ iodev_write(iodev_t *dev, void const *buf, size_t len) {
         iodev_error("iodev.write() called with invalid or closed device");
         return -1;
     }
-    return write(dev->fd, buf, len);
+    if (buf != NULL && len > 0)
+        buffer_put(&dev->rbuf, buf, len);
+    return len;
 }
 
 
