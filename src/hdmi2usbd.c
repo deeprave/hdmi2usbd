@@ -29,6 +29,8 @@ extern int daemon(int, int);
 #include <unistd.h>
 #endif
 
+#define COMMAND_PACE 500000       // 500ms == 500000us
+
 
 #include "hdmi2usbd.h"
 #include "logging.h"
@@ -212,21 +214,6 @@ hdmi2usb_process_client_data(struct hdmi2usb *app, iodev_t *dev) {
     }
 }
 
-// retrieve the current time in milliseconds
-static millitime_t
-get_millisecond_time() {
-    struct timeval now;
-    gettimeofday(&now, NULL);
-    return (now.tv_sec * 1000UL) + now.tv_usec;
-}
-
-// returns the raw difference between two millisecond time stamps
-// if now < len then result may be negative
-static long
-time_difference(millitime_t now, millitime_t then) {
-    return (long)(now - (long)then);
-}
-
 //
 // hdmi2usb_process_client_commands()
 // read lines of text from the connection's input buffer and
@@ -236,10 +223,10 @@ time_difference(millitime_t now, millitime_t then) {
 // a short period when the command is executed.
 
 static void
-hdmi2usb_process_client_commands(struct hdmi2usb *app, iodev_t *serial, iodev_t *dev, unsigned long now) {
+hdmi2usb_process_client_commands(struct hdmi2usb *app, iodev_t *serial, iodev_t *dev) {
     // Skip even checking unless it is time to send another command
-    if (time_difference(now, app->last_command) > 0L) {
-        // make sure we are accepting input from this device
+    if (timer_expired(&app->last_command)) {
+        // check we are have commands to send to this device
         stringstore_t *linebuf = dev->linebuf;
         if (linebuf != NULL && stringstore_length(linebuf) > 0) {
             stringstore_iterator_t iter = stringstore_iterator(linebuf);
@@ -252,7 +239,7 @@ hdmi2usb_process_client_commands(struct hdmi2usb *app, iodev_t *serial, iodev_t 
                 // Remove the command from the line buffer, and reset time last command was sent
                 stringstore_consume(linebuf, length);
                 // Need more accurate time here, don't want the latency of the processing loop omitted
-                app->last_command = get_millisecond_time();
+                timer_reset(&app->last_command, COMMAND_PACE);
             }
         }
 
@@ -275,7 +262,6 @@ hdmi2usb_process(struct hdmi2usb *app, int rc) {
     size_t s_bytes = hdmi2usb_process_serial_data(app, serial);
     int listener_count = 0;
     int connect_count = 0;
-    unsigned long now = get_millisecond_time(); // close enough, void repeating too much
     for (size_t index = 1; index < selector_device_count(&app->selector); index++) {
         iodev_t *dev = selector_get_device(&app->selector, index);
         if (iodev_is_listener(dev))
@@ -288,7 +274,7 @@ hdmi2usb_process(struct hdmi2usb *app, int rc) {
             // process input from network connection
             hdmi2usb_process_client_data(app, dev);
             // send any pending input on this connection to the device (maybe)
-            hdmi2usb_process_client_commands(app, serial, dev, now);
+            hdmi2usb_process_client_commands(app, serial, dev);
         }
     }
     // reset the copy buffer

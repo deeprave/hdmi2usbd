@@ -6,7 +6,7 @@
 #define HDMI2USBD_HDMI2USBD_H
 
 #include "selector.h"
-
+#include "timer.h"
 
 #define HDMI2USBD_VERSION "0.2"
 #define HDMI2USBD_NAME "hdmi2usbd"
@@ -48,7 +48,7 @@ struct hdmi2usb {
     selector_t selector;        // selector (including device array)
     buffer_t proc;              // serial input (pre-processing)
     buffer_t copy;              // output to network connections (post-processing)
-    millitime_t last_command;   // timestamp of last command
+    timer_t last_command;       // timestamp of last command
 };
 
 
