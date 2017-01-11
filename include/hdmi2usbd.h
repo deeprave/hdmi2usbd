@@ -48,7 +48,7 @@ struct hdmi2usb {
     selector_t selector;        // selector (including device array)
     buffer_t proc;              // serial input (pre-processing)
     buffer_t copy;              // output to network connections (post-processing)
-    timer_t last_command;       // timestamp of last command
+    microtimer_t last_command;       // timestamp of last command
 };
 
 

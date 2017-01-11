@@ -8,24 +8,24 @@
 #include <time.h>
 
 typedef unsigned long utime_t;
-typedef struct timer_s timer_t;
+typedef struct microtimer_s microtimer_t;
 
-struct timer_s {
+struct microtimer_s {
     unsigned int alloc;   // non-zero = heap allocated
     utime_t
         t_started,
         t_ending;
 };
 
-extern timer_t *timer_init(timer_t *timer, utime_t start, utime_t duration);
-extern timer_t *timer_reset(timer_t *timer, utime_t duration);
-extern timer_t *timer_since(timer_t *timer, utime_t start);
-extern void timer_free(timer_t *timer);
+extern microtimer_t *timer_init(microtimer_t *timer, utime_t start, utime_t duration);
+extern microtimer_t *timer_reset(microtimer_t *timer, utime_t duration);
+extern microtimer_t *timer_since(microtimer_t *timer, utime_t start);
+extern void timer_free(microtimer_t *timer);
 
-extern utime_t timer_elapsed(timer_t *timer);
-extern utime_t timer_remaining(timer_t *timer);
+extern utime_t timer_elapsed(microtimer_t *timer);
+extern utime_t timer_remaining(microtimer_t *timer);
 
-extern int timer_expired(timer_t *timer);
+extern int timer_expired(microtimer_t *timer);
 
 // retrieve the current time in milliseconds
 extern utime_t timer_getmillitime();

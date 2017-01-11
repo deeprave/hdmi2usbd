@@ -20,7 +20,7 @@ struct serial_cfg_s {
     char const *portname;
     unsigned long baudrate;
     struct termios *termctl;
-    timer_t pacer;
+    microtimer_t pacer;
 };
 
 extern serial_cfg_t *serial_getcfg(iodev_t *sdev);
