@@ -23,6 +23,7 @@ set(SUPPORT_SOURCE_FILES
         src/stringstore.c include/stringstore.h
         src/iodev.c include/iodev.h
         src/selector.c include/selector.h
+        src/timer.c include/timer.h
         src/serial.c include/serial.h
         src/nettcp.c include/nettcp.h
         src/device.c include/device.h)
