@@ -74,6 +74,7 @@ struct iodev_s {
     ssize_t (*read)(iodev_t *dev, void *buf, size_t len);
     ssize_t (*write)(iodev_t *dev, void const *buf, size_t len);
 
+    int (*sendOk)(iodev_t *dev);
 };
 
 

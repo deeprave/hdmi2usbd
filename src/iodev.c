@@ -146,8 +146,10 @@ iodev_set_masks(iodev_t *dev, fd_set *r, fd_set *w, fd_set *x) {
             break;
         case IODEV_CLOSING:     // pre-close flushing
             if (buffer_used(iodev_tbuf(dev)) > 0) {
-                FD_SET(dev->fd, w);
-                FD_SET(dev->fd, x);
+                if (dev->sendOk(dev)) {
+                    FD_SET(dev->fd, w);
+                    FD_SET(dev->fd, x);
+                }
                 is_active++;
             } else
                 dev->close(dev, IOFLAG_NONE);
@@ -259,6 +261,11 @@ iodev_write(iodev_t *dev, void const *buf, size_t len) {
     return len;
 }
 
+static int
+iodev_sendok(iodev_t *dev) {
+    return 1;
+}
+
 
 iodev_t *
 iodev_init(iodev_t *dev, iodev_cfg_t *cfg, size_t bufsize) {
@@ -286,6 +293,7 @@ iodev_init(iodev_t *dev, iodev_cfg_t *cfg, size_t bufsize) {
     dev->except_handler = iodev_except_handler;
     dev->read = iodev_read;
     dev->write = iodev_write;
+    dev->sendOk = iodev_sendok;
     return dev;
 }
 
