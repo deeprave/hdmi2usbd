@@ -155,6 +155,32 @@ serial_close(iodev_t *dev, int flags) {
     }
 }
 
+static ssize_t
+serial_write_handler(iodev_t *dev) {
+    ssize_t rc = -1;
+    iodev_cfg_t *cfg = iodev_getcfg(dev);
+
+    if (dev->fd == -1)
+        iodev_error("iodev %s write error: device is closed", cfg->name);
+    else {
+        size_t available = buffer_used(&dev->tbuf);
+        if (!available)
+            rc = available;
+        else { // write 1 character at a time...
+            unsigned char ch;
+            buffer_peek(&dev->tbuf, &ch, 1);
+            rc = write(dev->fd, &ch, 1);
+            if (rc < 0) {
+                iodev_error("iodev %s write error(%d): %s", cfg->name, errno, strerror(errno));
+                dev->close(dev, IODEV_NONE);
+            } else { // advance the counter by amount written
+                buffer_get(&dev->tbuf, NULL, (size_t)rc);
+            }
+        }
+    }
+    return rc;
+}
+
 
 static int
 serial_configure(iodev_t *dev, void *data) {
@@ -178,6 +204,7 @@ serial_create(iodev_t *dev, char const *devname, unsigned long baudrate, size_t 
 
     serial->open = serial_open;
     serial->close = serial_close;
+    serial->write_handler = serial_write_handler;
     serial->configure = serial_configure;
 
     return serial;
