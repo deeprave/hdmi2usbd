@@ -12,6 +12,8 @@
 
 #include "serial.h"
 
+#define CHARACTER_PACING   5000
+
 // Miscellaneous serial functions
 
 // baud rate mapping, note that we only support a subset
@@ -176,7 +178,7 @@ serial_write_handler(iodev_t *dev) {
                 dev->close(dev, IODEV_NONE);
             } else { // advance the counter by amount written
                 buffer_get(&dev->tbuf, NULL, (size_t)rc);
-                timer_reset(&scfg->pacer, 0);   // creates a pre-expired timer
+                timer_reset(&scfg->pacer, CHARACTER_PACING);
             }
         }
     }
