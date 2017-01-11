@@ -241,7 +241,7 @@ hdmi2usb_process_client_commands(struct hdmi2usb *app, iodev_t *serial, iodev_t 
     if (time_difference(now, app->last_command) > 0L) {
         // make sure we are accepting input from this device
         stringstore_t *linebuf = dev->linebuf;
-        if (linebuf != NULL) {
+        if (linebuf != NULL && stringstore_length(linebuf) > 0) {
             stringstore_iterator_t iter = stringstore_iterator(linebuf);
             size_t length =0;
             // Get the next command (if there is one)
