@@ -159,12 +159,13 @@ static ssize_t
 serial_write_handler(iodev_t *dev) {
     ssize_t rc = -1;
     iodev_cfg_t *cfg = iodev_getcfg(dev);
+    serial_cfg_t *scfg = serial_getcfg(dev);
 
     if (dev->fd == -1)
         iodev_error("iodev %s write error: device is closed", cfg->name);
     else {
         size_t available = buffer_used(&dev->tbuf);
-        if (!available)
+        if (!available || !timer_expired(&scfg->pacer))
             rc = available;
         else { // write 1 character at a time...
             unsigned char ch;
@@ -175,6 +176,7 @@ serial_write_handler(iodev_t *dev) {
                 dev->close(dev, IODEV_NONE);
             } else { // advance the counter by amount written
                 buffer_get(&dev->tbuf, NULL, (size_t)rc);
+                timer_reset(&scfg->pacer, 0);   // creates a pre-expired timer
             }
         }
     }
@@ -187,6 +189,11 @@ serial_configure(iodev_t *dev, void *data) {
     return 0;
 }
 
+static int
+serial_sendok(iodev_t *dev) {
+    serial_cfg_t *scfg = serial_getcfg(dev);
+    return timer_expired(&scfg->pacer);
+}
 
 iodev_t *
 serial_create(iodev_t *dev, char const *devname, unsigned long baudrate, size_t bufsize) {
@@ -201,11 +208,13 @@ serial_create(iodev_t *dev, char const *devname, unsigned long baudrate, size_t 
 
     // Set up the initial termios
     scfg->termctl = serial_termios(calloc(1, sizeof(struct termios)), (speed_t)baudrate);
+    timer_reset(&scfg->pacer, 0);   // creates a pre-expired timer
 
     serial->open = serial_open;
     serial->close = serial_close;
     serial->write_handler = serial_write_handler;
     serial->configure = serial_configure;
+    serial->sendOk = serial_sendok;
 
     return serial;
 }

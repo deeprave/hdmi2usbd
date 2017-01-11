@@ -11,6 +11,7 @@ unsigned long baud_to_speed(unsigned long baud);
 unsigned long speed_to_baud(unsigned long speed);
 
 #include "iodev.h"
+#include "timer.h"
 
 typedef struct serial_cfg_s serial_cfg_t;
 
@@ -19,6 +20,7 @@ struct serial_cfg_s {
     char const *portname;
     unsigned long baudrate;
     struct termios *termctl;
+    timer_t pacer;
 };
 
 extern serial_cfg_t *serial_getcfg(iodev_t *sdev);
