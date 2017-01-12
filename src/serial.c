@@ -114,8 +114,12 @@ serial_open(iodev_t *dev) {
             if (tcsetattr(dev->fd, TCSANOW, cfg->termctl) == -1)
                 iodev_error("serial tcsetattr '%s' (%d): %s", cfg->portname, errno, strerror(errno));
             else {
+#if 1
+                ioctl(dev->fd, TIOCCBRK);   // ignore errors
+#else
                 if (ioctl(dev->fd, TIOCCBRK) == -1)
                     iodev_notify("ioctl(TIOCCBRK) '%s' (%d): %s", cfg->portname, errno, strerror(errno));
+#endif
                 // set serial devices directly to "connected" state after successfully opened
                 iodev_setstate(dev, IODEV_CONNECTED);
                 return dev->fd;
