@@ -55,7 +55,7 @@ const char *helpopts[][3] = {
     { NULL,             NULL,                       "force sync after each log write" },
     { NULL,             NULL,                       "listen on only ipv4 address(es)" },
     { NULL,             NULL,                       "listen on only ipv6 address(es)" },
-    { NULL,             NULL,                       "detatch and fork into background" },
+    { NULL,             NULL,                       "detach and fork into background" },
     { NULL,             "0-7",                      "increase or set verbosity level" },
     { NULL,             "0-7",                      "same as --verbose -V" },
     { NULL,             NULL,                       "display version info" },
@@ -177,7 +177,7 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
                 char *at, *str = optarg;
                 if (str == NULL)
                     fprintf(stderr, "-l missing argument");
-                else if (*str == '[') {  // [address]:port sytnax
+                else if (*str == '[') {  // [address]:port syntax
                     at = strchr(str, ']');
                     if (at != NULL) {
                         size_t i = at - str - 1;
@@ -279,7 +279,7 @@ parse_args(int argc, char * const *argv, struct hdmi2usb_opts *opts) {
 int
 main(int argc, char * const *argv) {
     struct hdmi2usb app = {
-        .opts = {  // Defauts
+        .opts = {  // Defaults
             .verbose = 0,
             .logflags = 0,
             .logfile = NULL,
