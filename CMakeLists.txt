@@ -36,6 +36,8 @@ add_executable(hdmi2usbd
         ${HDMI2USBD_SOURCE_FILES}
         ${SUPPORT_SOURCE_FILES})
 
+install(TARGETS hdmi2usbd DESTINATION bin)
+
 ####
 # test support
 ####
