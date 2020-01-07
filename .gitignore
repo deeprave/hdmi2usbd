@@ -1,3 +1,7 @@
-/.idea
+/.idea/
 /build/
 /cmake-build*/
+/CMakefiles/
+/tests/googletest/*
+/lib/
+/.project
