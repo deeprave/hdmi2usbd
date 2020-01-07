@@ -7,6 +7,7 @@ project(${PROJECT_NAME})
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-unused-function")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+set(CMAKE_CXX_STANDARD 11)
 
 if (APPLE)
     add_definitions(-DGTEST_USE_OWN_TR1_TUPLE)
